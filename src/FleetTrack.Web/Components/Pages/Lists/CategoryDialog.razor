@@ -1,0 +1,46 @@
+@inject ReferenceDataService ReferenceData
+
+<MudDialog>
+    <DialogContent>
+        <EditForm Model="form" OnValidSubmit="SaveAsync" id="category-form">
+            <DataAnnotationsValidator />
+            <MudStack Spacing="3" Style="min-width: min(420px, 80vw)">
+                <MudTextField @bind-Value="form.Name" For="() => form.Name" Label="Name" Variant="Variant.Outlined" AutoFocus="true" />
+                <MudTextField @bind-Value="form.Description" For="() => form.Description" Label="Description (optional)" Variant="Variant.Outlined" />
+                <MudNumericField @bind-Value="form.SortOrder" For="() => form.SortOrder" Label="Position in lists" Variant="Variant.Outlined" />
+                <MudSwitch @bind-Value="form.IsActive" Color="Color.Primary" Label="Active (can be chosen for vehicles)" />
+                @if (error is not null)
+                {
+                    <MudAlert Severity="Severity.Error" Dense="true">@error</MudAlert>
+                }
+            </MudStack>
+        </EditForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => Dialog.Cancel()">Cancel</MudButton>
+        <MudButton ButtonType="ButtonType.Submit" form="category-form" Variant="Variant.Filled" Color="Color.Primary" Disabled="saving">Save</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+    [Parameter] public CategoryRow? Existing { get; set; }
+
+    private CategoryForm form = new();
+    private string? error;
+    private bool saving;
+
+    protected override void OnInitialized()
+    {
+        if (Existing is not null)
+            form = new CategoryForm { Name = Existing.Name, Description = Existing.Description, IsActive = Existing.IsActive, SortOrder = Existing.SortOrder };
+    }
+
+    private async Task SaveAsync()
+    {
+        saving = true;
+        var result = await ReferenceData.SaveCategoryAsync(Existing?.Id, form);
+        saving = false;
+        if (result.Succeeded) Dialog.Close(); else error = result.Error;
+    }
+}

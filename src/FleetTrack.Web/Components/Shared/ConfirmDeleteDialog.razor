@@ -1,0 +1,25 @@
+@* For permanent deletes: the admin must type a word (e.g. the registration number) to confirm,
+   which prevents deleting the wrong record with one careless click. *@
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3" Style="max-width: 460px">
+            <MudText Typo="Typo.body2">@Message</MudText>
+            <MudAlert Severity="Severity.Warning" Dense="true">This can't be undone.</MudAlert>
+            <MudTextField @bind-Value="typed" Immediate="true" Variant="Variant.Outlined" AutoFocus="true"
+                          Label="@($"Type {ConfirmText} to confirm")" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => Dialog.Cancel()">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Error" Disabled="!Matches" OnClick="() => Dialog.Close(true)">Delete permanently</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+    [Parameter, EditorRequired] public string Message { get; set; } = "";
+    [Parameter, EditorRequired] public string ConfirmText { get; set; } = "";
+
+    private string typed = "";
+    private bool Matches => string.Equals(typed.Trim(), ConfirmText, StringComparison.OrdinalIgnoreCase);
+}

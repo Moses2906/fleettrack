@@ -1,0 +1,128 @@
+@inject VehicleService Vehicles
+@inject ReferenceDataService ReferenceData
+
+<MudDialog>
+    <DialogContent>
+        @if (form is null)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+        }
+        else
+        {
+            <EditForm Model="form" OnValidSubmit="SaveAsync" id="vehicle-form">
+                <DataAnnotationsValidator />
+                <MudGrid Spacing="3">
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="form.RegistrationNumber" For="() => form.RegistrationNumber" Label="Registration number"
+                                      Variant="Variant.Outlined" AutoFocus="true" HelperText="e.g. CA 123-456 or HJ 45 KL GP"
+                                      Style="text-transform: uppercase" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudDatePicker @bind-Date="form.LicenceExpiryDate" For="() => form.LicenceExpiryDate" Label="Licence disk expiry"
+                                       Variant="Variant.Outlined" DateFormat="dd MMM yyyy" Editable="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudTextField @bind-Value="form.Make" For="() => form.Make" Label="Make" Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" sm="5">
+                        <MudTextField @bind-Value="form.Model" For="() => form.Model" Label="Model" Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" sm="3">
+                        <MudNumericField @bind-Value="form.Year" For="() => form.Year" Label="Year" Variant="Variant.Outlined" HideSpinButtons="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="int?" @bind-Value="form.CategoryId" For="() => form.CategoryId" Label="Category" Variant="Variant.Outlined">
+                            @foreach (var c in categories.Where(c => c.IsActive || c.Id == form.CategoryId))
+                            {
+                                <MudSelectItem T="int?" Value="c.Id">@c.Label</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="form.Vin" For="() => form.Vin" Label="VIN (optional)" Variant="Variant.Outlined" Style="text-transform: uppercase" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="int?" @bind-Value="form.LicenceHolderId" For="() => form.LicenceHolderId" Label="Licensed to" Variant="Variant.Outlined"
+                                   HelperText="Missing? Add it under Lists → Licence holders.">
+                            @foreach (var h in holders)
+                            {
+                                <MudSelectItem T="int?" Value="h.Id">@h.Label</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="int?" @bind-Value="form.CurrentDriverId" Label="Current driver" Variant="Variant.Outlined" Clearable="true">
+                            @foreach (var d in drivers.Where(d => d.IsActive || d.Id == form.CurrentDriverId))
+                            {
+                                <MudSelectItem T="int?" Value="d.Id">@d.Label</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.subtitle2" Class="mb-1">Documents we have</MudText>
+                        <div class="d-flex flex-wrap gap-x-4">
+                            <MudCheckBox @bind-Value="form.HasRc1" Label="RC1" Color="Color.Primary" />
+                            <MudCheckBox @bind-Value="form.HasBrnc" Label="BRNC" Color="Color.Primary" />
+                            <MudCheckBox @bind-Value="form.HasProxyLetter" Label="Proxy letter" Color="Color.Primary" />
+                            <MudCheckBox @bind-Value="form.HasProxyId" Label="Proxy ID" Color="Color.Primary" />
+                        </div>
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="form.Notes" For="() => form.Notes" Label="Notes (optional)" Variant="Variant.Outlined"
+                                      Lines="3" Sizing="InputSizing.Auto" MaxLines="8" Counter="2000" MaxLength="2000" />
+                    </MudItem>
+                </MudGrid>
+                @if (error is not null)
+                {
+                    <MudAlert Severity="Severity.Error" Class="mt-4" Dense="true">@error</MudAlert>
+                }
+            </EditForm>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => Dialog.Cancel()">Cancel</MudButton>
+        <MudButton ButtonType="ButtonType.Submit" form="vehicle-form" Variant="Variant.Filled" Color="Color.Primary" Disabled="saving || form is null">
+            @(VehicleId is null ? "Add vehicle" : "Save changes")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+
+    /// <summary>Null to add a new vehicle.</summary>
+    [Parameter] public int? VehicleId { get; set; }
+
+    private VehicleForm? form;
+    private List<Option> categories = [];
+    private List<Option> holders = [];
+    private List<Option> drivers = [];
+    private string? error;
+    private bool saving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        categories = await ReferenceData.CategoryOptionsAsync();
+        holders = await ReferenceData.LicenceHolderOptionsAsync();
+        drivers = await ReferenceData.DriverOptionsAsync();
+
+        form = VehicleId is { } id
+            ? await Vehicles.GetFormAsync(id)
+            : new VehicleForm { LicenceExpiryDate = DateTime.Today.AddYears(1) };
+        if (form is null)
+            error = "This vehicle has been deleted.";
+    }
+
+    private async Task SaveAsync()
+    {
+        saving = true;
+        error = null;
+        var result = VehicleId is { } id ? await Vehicles.UpdateAsync(id, form!) : await Vehicles.CreateAsync(form!);
+        saving = false;
+
+        if (result.Succeeded)
+            Dialog.Close(DialogResult.Ok(result.Id ?? VehicleId));
+        else
+            error = result.Error;
+    }
+}

@@ -1,0 +1,218 @@
+@page "/vehicles/{Id:int}"
+@attribute [Authorize(Policy = nameof(Permission.ViewRecords))]
+@inject VehicleService Vehicles
+@inject PermissionService Permissions
+@inject NavigationManager Navigation
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+
+<PageTitle>@(vehicle?.Row.RegistrationNumber ?? "Vehicle") · FleetTrack</PageTitle>
+
+<MudButton Href="vehicles" Variant="Variant.Text" StartIcon="@Icons.Material.Rounded.ArrowBack" Class="mb-2 ml-n2">All vehicles</MudButton>
+
+@if (notFound)
+{
+    <EmptyState Icon="@Icons.Material.Rounded.SearchOff" Title="Vehicle not found" Message="It may have been deleted.">
+        <MudButton Href="vehicles" Variant="Variant.Filled" Color="Color.Primary">Back to vehicles</MudButton>
+    </EmptyState>
+}
+else if (vehicle is null)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    var v = vehicle.Row;
+    <PageHeader Title="@v.RegistrationNumber" Subtitle="@($"{v.MakeAndModel}{(v.Year is null ? "" : $" · {v.Year}")} · {v.Category}")">
+        <Actions>
+            @if (canEdit)
+            {
+                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Rounded.Edit" OnClick="EditAsync">Edit</MudButton>
+            }
+            @if (canDelete)
+            {
+                <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Rounded.DeleteOutline" OnClick="DeleteAsync">Delete</MudButton>
+            }
+        </Actions>
+    </PageHeader>
+
+    <MudGrid Spacing="4">
+        <MudItem xs="12" md="4">
+            <MudPaper Outlined="true" Elevation="0" Class="pa-5 h-100">
+                <MudText Typo="Typo.overline" Class="mud-text-secondary">Licence disk</MudText>
+                <MudText Typo="Typo.h5" Class="mt-1">@v.LicenceExpiryDate.ToString("dd MMMM yyyy")</MudText>
+                <div class="mt-2"><LicenceStatusChip ExpiryDate="v.LicenceExpiryDate" Today="Vehicles.Today" Size="Size.Medium" /></div>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="4">
+            <MudPaper Outlined="true" Elevation="0" Class="pa-5 h-100">
+                <MudText Typo="Typo.overline" Class="mud-text-secondary">Licensed to</MudText>
+                <MudText Typo="Typo.h6" Class="mt-1">@v.LicenceHolder</MudText>
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">
+                    @(vehicle.HolderType == HolderType.Company ? "Company reg. no." : "ID number") @vehicle.HolderIdentifierForDisplay
+                </MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="4">
+            <MudPaper Outlined="true" Elevation="0" Class="pa-5 h-100">
+                <MudText Typo="Typo.overline" Class="mud-text-secondary">Current driver</MudText>
+                @if (v.Driver is null)
+                {
+                    <MudText Typo="Typo.h6" Class="mt-1 mud-text-disabled">Unassigned</MudText>
+                }
+                else
+                {
+                    <MudText Typo="Typo.h6" Class="mt-1">@v.Driver</MudText>
+                    @if (vehicle.DriverPhone is not null)
+                    {
+                        <MudLink Href="@($"tel:{vehicle.DriverPhone.Replace(" ", "")}")" Typo="Typo.body2">@vehicle.DriverPhone</MudLink>
+                    }
+                }
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <MudPaper Outlined="true" Elevation="0" Class="pa-5 h-100">
+                <div class="d-flex align-center justify-space-between mb-2">
+                    <MudText Typo="Typo.h6">Document checklist</MudText>
+                    @if (v.HasAllDocuments)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Text" Icon="@Icons.Material.Rounded.CheckCircle">Complete</MudChip>
+                    }
+                    else
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Error" Variant="Variant.Text" Icon="@Icons.Material.Rounded.Error">@v.MissingDocumentCount missing</MudChip>
+                    }
+                </div>
+                <MudText Typo="Typo.body2" Class="mud-text-secondary mb-2">
+                    @(canEdit ? "Tick a document when you have it. Uploading a copy (Phase 4) ticks it automatically." : "Which documents we have on file for this vehicle.")
+                </MudText>
+                @foreach (var (type, name) in DocumentNames)
+                {
+                    <div class="d-flex align-center justify-space-between py-1">
+                        <MudText>@name</MudText>
+                        <MudSwitch T="bool" Value="HasDocument(type)" ValueChanged="held => SetDocumentAsync(type, held)"
+                                   Color="Color.Success" UncheckedColor="Color.Error" ReadOnly="!canEdit"
+                                   aria-label="@name" />
+                    </div>
+                }
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="6">
+            <MudPaper Outlined="true" Elevation="0" Class="pa-5 h-100">
+                <MudText Typo="Typo.h6" Class="mb-3">Vehicle</MudText>
+                <MudSimpleTable Dense="true" Elevation="0" Bordered="false" Class="ft-facts">
+                    <tbody>
+                        <tr><td>Category</td><td>@v.Category</td></tr>
+                        <tr><td>Make & model</td><td>@v.MakeAndModel</td></tr>
+                        <tr><td>Year</td><td>@(v.Year?.ToString() ?? "—")</td></tr>
+                        <tr><td>VIN</td><td>@(vehicle.Vin ?? "—")</td></tr>
+                        <tr><td>Last updated</td><td>@SouthAfricanTime.ToLocal(vehicle.UpdatedAtUtc).ToString("dd MMM yyyy HH:mm")</td></tr>
+                    </tbody>
+                </MudSimpleTable>
+                <MudText Typo="Typo.subtitle2" Class="mt-4">Notes</MudText>
+                @* white-space: pre-line keeps the line breaks people typed; Razor still HTML-encodes the text. *@
+                <MudText Typo="Typo.body2" Style="white-space: pre-line" Class="@(vehicle.Notes is null ? "mud-text-disabled" : "")">@(vehicle.Notes ?? "No notes.")</MudText>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12">
+            <MudPaper Outlined="true" Elevation="0">
+                <MudTabs Elevation="0" ApplyEffectsToContainer="true" TabPanelsClass="pa-2">
+                    <MudTabPanel Text="Documents" Icon="@Icons.Material.Rounded.Description">
+                        <EmptyState Icon="@Icons.Material.Rounded.UploadFile" Title="Document copies arrive in Phase 4"
+                                    Message="Upload and view RC1, BRNC, proxy letter and proxy ID copies here." />
+                    </MudTabPanel>
+                    <MudTabPanel Text="Services" Icon="@Icons.Material.Rounded.Build">
+                        <EmptyState Icon="@Icons.Material.Rounded.Build" Title="Service log arrives in Phase 5" />
+                    </MudTabPanel>
+                    <MudTabPanel Text="Renewals" Icon="@Icons.Material.Rounded.Autorenew">
+                        <EmptyState Icon="@Icons.Material.Rounded.Autorenew" Title="Licence renewals arrive in Phase 5" />
+                    </MudTabPanel>
+                </MudTabs>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private static readonly (DocumentType Type, string Name)[] DocumentNames =
+    [
+        (DocumentType.Rc1, "RC1 (registration certificate)"),
+        (DocumentType.Brnc, "BRNC (business registration)"),
+        (DocumentType.ProxyLetter, "Proxy letter"),
+        (DocumentType.ProxyId, "Proxy ID"),
+    ];
+
+    private VehicleDetails? vehicle;
+    private bool notFound;
+    private bool canEdit;
+    private bool canDelete;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Only used to decide which buttons to show; the service checks again on every action.
+        canEdit = await Permissions.HasAsync(Permission.EditRecords);
+        canDelete = await Permissions.HasAsync(Permission.DeleteRecords);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        vehicle = await Vehicles.GetAsync(Id);
+        notFound = vehicle is null;
+    }
+
+    private bool HasDocument(DocumentType type) => type switch
+    {
+        DocumentType.Rc1 => vehicle!.Row.HasRc1,
+        DocumentType.Brnc => vehicle!.Row.HasBrnc,
+        DocumentType.ProxyLetter => vehicle!.Row.HasProxyLetter,
+        _ => vehicle!.Row.HasProxyId,
+    };
+
+    private async Task SetDocumentAsync(DocumentType type, bool held)
+    {
+        var result = await Vehicles.SetDocumentHeldAsync(Id, type, held);
+        if (!result.Succeeded)
+            Snackbar.Add(result.Error ?? "Couldn't update the checklist.", Severity.Error);
+        await LoadAsync();
+    }
+
+    private async Task EditAsync()
+    {
+        var parameters = new DialogParameters<VehicleDialog> { { d => d.VehicleId, Id } };
+        var dialog = await Dialogs.ShowAsync<VehicleDialog>("Edit vehicle", parameters, new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        if ((await dialog.Result) is { Canceled: false })
+        {
+            Snackbar.Add("Vehicle updated.", Severity.Success);
+            await LoadAsync();
+        }
+    }
+
+    private async Task DeleteAsync()
+    {
+        var registration = vehicle!.Row.RegistrationNumber;
+        var parameters = new DialogParameters<ConfirmDeleteDialog>
+        {
+            { d => d.Message, $"This permanently deletes {registration} together with all its documents, services and licence renewals. Use this for POPIA deletion requests or vehicles entered by mistake." },
+            { d => d.ConfirmText, registration },
+        };
+        var dialog = await Dialogs.ShowAsync<ConfirmDeleteDialog>("Delete vehicle", parameters);
+        if ((await dialog.Result) is not { Canceled: false })
+            return;
+
+        var result = await Vehicles.DeleteAsync(Id);
+        if (result.Succeeded)
+        {
+            Snackbar.Add($"{registration} deleted.", Severity.Success);
+            Navigation.NavigateTo("vehicles");
+        }
+        else
+        {
+            Snackbar.Add(result.Error ?? "Couldn't delete the vehicle.", Severity.Error);
+        }
+    }
+}

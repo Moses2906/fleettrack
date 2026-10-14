@@ -1,0 +1,208 @@
+@page "/vehicles"
+@attribute [Authorize(Policy = nameof(Permission.ViewRecords))]
+@inject VehicleService Vehicles
+@inject ReferenceDataService ReferenceData
+@inject NavigationManager Navigation
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+
+<PageTitle>Vehicles · FleetTrack</PageTitle>
+
+<PageHeader Title="Vehicles" Subtitle="@Subtitle">
+    <Actions>
+        <AuthorizeView Policy="@nameof(Permission.EditRecords)">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.Add" OnClick="AddAsync">Add vehicle</MudButton>
+        </AuthorizeView>
+    </Actions>
+</PageHeader>
+
+<MudPaper Outlined="true" Elevation="0">
+    <div class="px-4 pt-4 pb-1">
+        <MudGrid Spacing="2">
+            <MudItem xs="12" md="4">
+                <MudTextField @bind-Value="search" Immediate="true" Clearable="true" Variant="Variant.Outlined" Margin="Margin.Dense"
+                              Placeholder="Search registration, make, driver or owner"
+                              Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Rounded.Search" />
+            </MudItem>
+            <MudItem xs="6" sm="4" md="2">
+                <MudSelect T="StatusFilter" @bind-Value="status" Label="Licence disk" Variant="Variant.Outlined" Margin="Margin.Dense">
+                    <MudSelectItem Value="StatusFilter.All">All</MudSelectItem>
+                    <MudSelectItem Value="StatusFilter.Attention">Needs attention</MudSelectItem>
+                    <MudSelectItem Value="StatusFilter.Expired">Expired</MudSelectItem>
+                    <MudSelectItem Value="StatusFilter.DueSoon">Due within 30 days</MudSelectItem>
+                    <MudSelectItem Value="StatusFilter.Valid">Valid</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="6" sm="4" md="2">
+                <MudSelect T="int?" @bind-Value="categoryId" Label="Category" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                    @foreach (var c in categories)
+                    {
+                        <MudSelectItem T="int?" Value="c.Id">@c.Label</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="6" sm="4" md="2">
+                <MudSelect T="int?" @bind-Value="driverId" Label="Driver" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                    <MudSelectItem T="int?" Value="NoDriver">No driver assigned</MudSelectItem>
+                    @foreach (var d in drivers)
+                    {
+                        <MudSelectItem T="int?" Value="d.Id">@d.Label</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="6" sm="12" md="2" Class="d-flex align-center">
+                <MudSwitch @bind-Value="missingDocsOnly" Color="Color.Error" Label="Missing documents" />
+            </MudItem>
+        </MudGrid>
+    </div>
+    <MudTable Items="vehicles" Filter="Matches" Loading="vehicles is null" Hover="true" Breakpoint="Breakpoint.Md"
+              Elevation="0" RowsPerPage="50" OnRowClick="@((TableRowClickEventArgs<VehicleRow> e) => Open(e.Item!))"
+              Class="ft-clickable-rows" LoadingProgressColor="Color.Primary" T="VehicleRow">
+        <HeaderContent>
+            <MudTh><MudTableSortLabel InitialDirection="SortDirection.Ascending" SortBy="(VehicleRow v) => v.RegistrationNumber">Registration</MudTableSortLabel></MudTh>
+            <MudTh><MudTableSortLabel SortBy="(VehicleRow v) => v.MakeAndModel">Make & model</MudTableSortLabel></MudTh>
+            <MudTh><MudTableSortLabel SortBy="(VehicleRow v) => v.Category">Category</MudTableSortLabel></MudTh>
+            <MudTh><MudTableSortLabel SortBy="(VehicleRow v) => v.LicenceExpiryDate">Disk expiry</MudTableSortLabel></MudTh>
+            <MudTh>Licensed to</MudTh>
+            <MudTh>Driver</MudTh>
+            <MudTh>Documents</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Registration"><span class="ft-reg">@context.RegistrationNumber</span></MudTd>
+            <MudTd DataLabel="Make & model">
+                @context.MakeAndModel
+                @if (context.Year is not null)
+                {
+                    <span class="mud-text-secondary"> · @context.Year</span>
+                }
+            </MudTd>
+            <MudTd DataLabel="Category">@context.Category</MudTd>
+            <MudTd DataLabel="Disk expiry">
+                <div class="d-flex flex-column align-start">
+                    <span>@context.LicenceExpiryDate.ToString("dd MMM yyyy")</span>
+                    <LicenceStatusChip ExpiryDate="context.LicenceExpiryDate" Today="today" />
+                </div>
+            </MudTd>
+            <MudTd DataLabel="Licensed to">@context.LicenceHolder</MudTd>
+            <MudTd DataLabel="Driver">
+                @if (context.Driver is null)
+                {
+                    <span class="mud-text-disabled">Unassigned</span>
+                }
+                else
+                {
+                    @context.Driver
+                }
+            </MudTd>
+            <MudTd DataLabel="Documents">
+                <DocumentChecklist HasRc1="context.HasRc1" HasBrnc="context.HasBrnc" HasProxyLetter="context.HasProxyLetter" HasProxyId="context.HasProxyId" />
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            @if (vehicles is { Count: 0 })
+            {
+                <EmptyState Icon="@Icons.Material.Rounded.DirectionsCar" Title="No vehicles yet"
+                            Message="Add your first vehicle to start tracking licence disks and documents." />
+            }
+            else
+            {
+                <EmptyState Icon="@Icons.Material.Rounded.SearchOff" Title="No vehicles match"
+                            Message="Try a different search, or clear the filters.">
+                    <MudButton Variant="Variant.Outlined" OnClick="ClearFilters">Clear filters</MudButton>
+                </EmptyState>
+            }
+        </NoRecordsContent>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="[25, 50, 100]" />
+        </PagerContent>
+    </MudTable>
+</MudPaper>
+
+@code {
+    private enum StatusFilter { All, Attention, Expired, DueSoon, Valid }
+    private const int NoDriver = -1;
+
+    // Dashboard links open this page pre-filtered, e.g. /vehicles?status=expired or ?missing=true
+    [SupplyParameterFromQuery(Name = "status")] public string? StatusQuery { get; set; }
+    [SupplyParameterFromQuery(Name = "missing")] public bool? MissingQuery { get; set; }
+
+    private List<VehicleRow>? vehicles;
+    private List<Option> categories = [];
+    private List<Option> drivers = [];
+    private DateOnly today;
+
+    private string search = "";
+    private StatusFilter status;
+    private int? categoryId;
+    private int? driverId;
+    private bool missingDocsOnly;
+
+    private string Subtitle => vehicles is null ? "Loading…" : $"{vehicles.Count} vehicles. Click a vehicle to see its details.";
+
+    protected override async Task OnInitializedAsync()
+    {
+        today = Vehicles.Today;
+        status = StatusQuery?.ToLowerInvariant() switch
+        {
+            "expired" => StatusFilter.Expired,
+            "due" => StatusFilter.DueSoon,
+            "attention" => StatusFilter.Attention,
+            "valid" => StatusFilter.Valid,
+            _ => StatusFilter.All,
+        };
+        missingDocsOnly = MissingQuery == true;
+
+        categories = await ReferenceData.CategoryOptionsAsync();
+        drivers = await ReferenceData.DriverOptionsAsync();
+        vehicles = await Vehicles.ListAsync();
+    }
+
+    private bool Matches(VehicleRow v)
+    {
+        if (categoryId is not null && v.CategoryId != categoryId) return false;
+        if (driverId == NoDriver && v.DriverId is not null) return false;
+        if (driverId is > 0 && v.DriverId != driverId) return false;
+        if (missingDocsOnly && v.HasAllDocuments) return false;
+
+        var vehicleStatus = v.StatusOn(today);
+        var statusMatches = status switch
+        {
+            StatusFilter.Expired => vehicleStatus == LicenceStatus.Expired,
+            StatusFilter.DueSoon => vehicleStatus == LicenceStatus.DueSoon,
+            StatusFilter.Valid => vehicleStatus == LicenceStatus.Valid,
+            StatusFilter.Attention => vehicleStatus != LicenceStatus.Valid,
+            _ => true,
+        };
+        if (!statusMatches) return false;
+
+        if (string.IsNullOrWhiteSpace(search)) return true;
+        var term = search.Trim();
+        // Searching "CA123456" also finds "CA 123-456".
+        var plateKey = RegistrationNumbers.ToKey(term);
+        return (plateKey.Length > 0 && RegistrationNumbers.ToKey(v.RegistrationNumber).Contains(plateKey))
+            || v.MakeAndModel.Contains(term, StringComparison.OrdinalIgnoreCase)
+            || v.LicenceHolder.Contains(term, StringComparison.OrdinalIgnoreCase)
+            || (v.Driver?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false);
+    }
+
+    private void ClearFilters()
+    {
+        search = "";
+        status = StatusFilter.All;
+        categoryId = null;
+        driverId = null;
+        missingDocsOnly = false;
+    }
+
+    private void Open(VehicleRow vehicle) => Navigation.NavigateTo($"vehicles/{vehicle.Id}");
+
+    private async Task AddAsync()
+    {
+        var dialog = await Dialogs.ShowAsync<VehicleDialog>("Add vehicle", new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        if ((await dialog.Result) is { Canceled: false, Data: int newId })
+        {
+            Snackbar.Add("Vehicle added.", Severity.Success);
+            Navigation.NavigateTo($"vehicles/{newId}");
+        }
+    }
+}

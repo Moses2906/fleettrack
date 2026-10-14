@@ -14,15 +14,6 @@ public record UserSummary(
 
 public record UserForm(string FullName, string Email, string Role, string? Password);
 
-/// <summary>The result of an admin action: success, or a message that is safe to show the user.</summary>
-public record OperationResult(bool Succeeded, string? Error = null)
-{
-    public static readonly OperationResult Ok = new(true);
-    public static OperationResult Fail(string error) => new(false, error);
-    public static OperationResult From(IdentityResult result) =>
-        result.Succeeded ? Ok : Fail(string.Join(" ", result.Errors.Select(e => e.Description)));
-}
-
 /// <summary>
 /// Creating, editing, disabling and deleting user accounts. Admin only.
 /// Every method checks the permission itself, and every change is written to the audit log.

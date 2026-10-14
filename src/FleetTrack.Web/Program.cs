@@ -1,12 +1,10 @@
 using FleetTrack.Core.Rules;
-using FleetTrack.Core.Security;
 using FleetTrack.Web.Components;
 using FleetTrack.Web.Components.Account;
 using FleetTrack.Web.Data;
 using FleetTrack.Web.Data.Seeding;
 using FleetTrack.Web.Security;
 using FleetTrack.Web.Services;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -101,17 +99,7 @@ builder.Services.Configure<SecurityStampValidatorOptions>(options => options.Val
 // Authorization: what may you do?
 // ---------------------------------------------------------------------------
 
-var authorization = builder.Services.AddAuthorizationBuilder()
-    // Every page and endpoint requires a signed-in user unless it is explicitly marked [AllowAnonymous].
-    // Secure by default: a new page someone forgets to protect is still protected.
-    .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
-
-// One policy per permission, e.g. [Authorize(Policy = nameof(Permission.ManageUsers))].
-// Which roles hold which permission is defined once, in RolePermissions.
-foreach (var permission in Enum.GetValues<Permission>())
-{
-    authorization.AddPolicy(permission.ToString(), policy => policy.RequireRole(RolePermissions.RolesWith(permission)));
-}
+builder.Services.AddFleetTrackAuthorization();
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<CurrentUserService>();
@@ -125,6 +113,8 @@ builder.Services.AddScoped<PermissionService>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<AuditService>();
 builder.Services.AddScoped<UserAdminService>();
+builder.Services.AddScoped<VehicleService>();
+builder.Services.AddScoped<ReferenceDataService>();
 
 builder.Services.AddHsts(options =>
 {

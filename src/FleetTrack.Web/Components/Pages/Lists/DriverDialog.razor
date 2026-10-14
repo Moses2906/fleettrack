@@ -1,0 +1,47 @@
+@inject ReferenceDataService ReferenceData
+
+<MudDialog>
+    <DialogContent>
+        @if (form is not null)
+        {
+            <EditForm Model="form" OnValidSubmit="SaveAsync" id="driver-form">
+                <DataAnnotationsValidator />
+                <MudStack Spacing="3" Style="min-width: min(420px, 80vw)">
+                    <MudTextField @bind-Value="form.FullName" For="() => form.FullName" Label="Full name" Variant="Variant.Outlined" AutoFocus="true" />
+                    <MudTextField @bind-Value="form.Phone" For="() => form.Phone" Label="Phone" Variant="Variant.Outlined" InputType="InputType.Telephone" />
+                    <MudTextField @bind-Value="form.Email" For="() => form.Email" Label="Email" Variant="Variant.Outlined" InputType="InputType.Email" />
+                    <MudTextField @bind-Value="form.DriverLicenceNumber" For="() => form.DriverLicenceNumber" Label="Driver's licence number" Variant="Variant.Outlined" />
+                    <MudSwitch @bind-Value="form.IsActive" Color="Color.Primary" Label="Active (can be assigned to vehicles)" />
+                    @if (error is not null)
+                    {
+                        <MudAlert Severity="Severity.Error" Dense="true">@error</MudAlert>
+                    }
+                </MudStack>
+            </EditForm>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => Dialog.Cancel()">Cancel</MudButton>
+        <MudButton ButtonType="ButtonType.Submit" form="driver-form" Variant="Variant.Filled" Color="Color.Primary" Disabled="saving">Save</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+    [Parameter] public int? DriverId { get; set; }
+
+    private DriverForm? form;
+    private string? error;
+    private bool saving;
+
+    protected override async Task OnInitializedAsync() =>
+        form = DriverId is { } id ? await ReferenceData.GetDriverFormAsync(id) : new DriverForm();
+
+    private async Task SaveAsync()
+    {
+        saving = true;
+        var result = await ReferenceData.SaveDriverAsync(DriverId, form!);
+        saving = false;
+        if (result.Succeeded) Dialog.Close(); else error = result.Error;
+    }
+}

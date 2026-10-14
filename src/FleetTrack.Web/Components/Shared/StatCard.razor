@@ -1,0 +1,19 @@
+@* A dashboard number that links to the matching filtered list. *@
+<MudPaper Outlined="true" Elevation="0" Class="pa-4 ft-stat" Style="cursor: pointer" @onclick="() => Navigation.NavigateTo(Href)">
+    <div class="d-flex align-center justify-space-between">
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">@Label</MudText>
+        <div class="ft-stat-icon" style="background: @($"var(--mud-palette-{Colour.ToString().ToLowerInvariant()}-hover)")">
+            <MudIcon Icon="@Icon" Color="Colour" Size="Size.Small" />
+        </div>
+    </div>
+    <MudText Typo="Typo.h4" Class="mt-2">@Value</MudText>
+</MudPaper>
+
+@code {
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Parameter, EditorRequired] public string Href { get; set; } = "";
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    [Parameter] public int Value { get; set; }
+    [Parameter] public string Icon { get; set; } = "";
+    [Parameter] public Color Colour { get; set; } = Color.Primary;
+}

@@ -1,14 +1,106 @@
 @page "/"
 @attribute [Authorize(Policy = nameof(Permission.ViewRecords))]
+@inject VehicleService Vehicles
+@inject NavigationManager Navigation
 
 <PageTitle>Dashboard · FleetTrack</PageTitle>
 
 <AuthorizeView Context="auth">
-    <PageHeader Title="@($"Welcome, {auth.User.DisplayName()}")"
-                Subtitle="@($"Signed in as {(auth.User.IsInRole(Roles.Admin) ? "an Admin" : "Staff")}.")" />
+    <PageHeader Title="@($"Hello, {FirstName(auth.User.DisplayName())}")" Subtitle="@($"Here's your fleet today, {today:dddd d MMMM yyyy}.")" />
 </AuthorizeView>
 
-<MudPaper Class="pa-2" Elevation="0" Outlined="true">
-    <EmptyState Icon="@Icons.Material.Rounded.SpaceDashboard" Title="Dashboard coming in Phase 3"
-                Message="Counts of expired disks, disks due within 30 days and missing documents will appear here." />
-</MudPaper>
+@if (summary is null)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    <MudGrid Spacing="4" Class="mb-2">
+        <MudItem xs="6" md="3">
+            <StatCard Href="vehicles" Label="Vehicles" Value="summary.TotalVehicles" Icon="@Icons.Material.Rounded.DirectionsCar" Colour="Color.Primary" />
+        </MudItem>
+        <MudItem xs="6" md="3">
+            <StatCard Href="vehicles?status=expired" Label="Expired disks" Value="summary.Expired" Icon="@Icons.Material.Rounded.Error" Colour="Color.Error" />
+        </MudItem>
+        <MudItem xs="6" md="3">
+            <StatCard Href="vehicles?status=due" Label="Due within 30 days" Value="summary.DueSoon" Icon="@Icons.Material.Rounded.Schedule" Colour="Color.Warning" />
+        </MudItem>
+        <MudItem xs="6" md="3">
+            <StatCard Href="vehicles?missing=true" Label="Missing documents" Value="summary.MissingDocuments" Icon="@Icons.Material.Rounded.FolderOff" Colour="Color.Secondary" />
+        </MudItem>
+    </MudGrid>
+
+    <MudGrid Spacing="4">
+        <MudItem xs="12" lg="7">
+            <MudPaper Outlined="true" Elevation="0" Class="h-100">
+                <div class="d-flex align-center justify-space-between pa-4 pb-2">
+                    <MudText Typo="Typo.h6">Licence disks needing attention</MudText>
+                    <MudButton Href="vehicles?status=attention" Size="Size.Small" EndIcon="@Icons.Material.Rounded.ChevronRight">View all</MudButton>
+                </div>
+                @if (summary.LicenceAttention.Count == 0)
+                {
+                    <EmptyState Icon="@Icons.Material.Rounded.Verified" Title="All disks are valid"
+                                Message="Nothing expires in the next 30 days." />
+                }
+                else
+                {
+                    <MudList T="VehicleRow" Dense="false" Class="pt-0">
+                        @foreach (var v in summary.LicenceAttention)
+                        {
+                            <MudListItem T="VehicleRow" OnClick="() => Open(v)">
+                                <div class="d-flex align-center justify-space-between gap-3 flex-wrap">
+                                    <div>
+                                        <span class="ft-reg">@v.RegistrationNumber</span>
+                                        <MudText Typo="Typo.body2" Class="mud-text-secondary">@v.MakeAndModel · expires @v.LicenceExpiryDate.ToString("dd MMM yyyy")</MudText>
+                                    </div>
+                                    <LicenceStatusChip ExpiryDate="v.LicenceExpiryDate" Today="today" />
+                                </div>
+                            </MudListItem>
+                        }
+                    </MudList>
+                }
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" lg="5">
+            <MudPaper Outlined="true" Elevation="0" Class="h-100">
+                <div class="d-flex align-center justify-space-between pa-4 pb-2">
+                    <MudText Typo="Typo.h6">Missing documents</MudText>
+                    <MudButton Href="vehicles?missing=true" Size="Size.Small" EndIcon="@Icons.Material.Rounded.ChevronRight">View all</MudButton>
+                </div>
+                @if (summary.DocumentAttention.Count == 0)
+                {
+                    <EmptyState Icon="@Icons.Material.Rounded.FolderSpecial" Title="Every document is on file" />
+                }
+                else
+                {
+                    <MudList T="VehicleRow" Class="pt-0">
+                        @foreach (var v in summary.DocumentAttention)
+                        {
+                            <MudListItem T="VehicleRow" OnClick="() => Open(v)">
+                                <span class="ft-reg">@v.RegistrationNumber</span>
+                                <div class="mt-1">
+                                    <DocumentChecklist HasRc1="v.HasRc1" HasBrnc="v.HasBrnc" HasProxyLetter="v.HasProxyLetter" HasProxyId="v.HasProxyId" />
+                                </div>
+                            </MudListItem>
+                        }
+                    </MudList>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private DashboardSummary? summary;
+    private DateOnly today;
+
+    protected override async Task OnInitializedAsync()
+    {
+        today = Vehicles.Today;
+        summary = await Vehicles.GetDashboardAsync();
+    }
+
+    private void Open(VehicleRow vehicle) => Navigation.NavigateTo($"vehicles/{vehicle.Id}");
+
+    private static string FirstName(string name) => name.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? name;
+}

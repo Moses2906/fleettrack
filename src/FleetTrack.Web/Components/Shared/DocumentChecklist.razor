@@ -1,0 +1,27 @@
+@* Compact view of the four required documents: a tick or a cross for each. *@
+<div class="d-flex gap-1 flex-wrap">
+    @foreach (var (label, name, held) in Items)
+    {
+        <MudTooltip Text="@($"{name}: {(held ? "on file" : "missing")}")">
+            <span class="ft-doc @(held ? "ft-doc-held" : "ft-doc-missing")" aria-label="@($"{name} {(held ? "on file" : "missing")}")">
+                <MudIcon Icon="@(held ? Icons.Material.Rounded.Check : Icons.Material.Rounded.Close)" Style="font-size: 0.85rem" />
+                @label
+            </span>
+        </MudTooltip>
+    }
+</div>
+
+@code {
+    [Parameter] public bool HasRc1 { get; set; }
+    [Parameter] public bool HasBrnc { get; set; }
+    [Parameter] public bool HasProxyLetter { get; set; }
+    [Parameter] public bool HasProxyId { get; set; }
+
+    private IEnumerable<(string Label, string Name, bool Held)> Items =>
+    [
+        ("RC1", "RC1 (registration certificate)", HasRc1),
+        ("BRNC", "BRNC (business registration)", HasBrnc),
+        ("Letter", "Proxy letter", HasProxyLetter),
+        ("ID", "Proxy ID", HasProxyId),
+    ];
+}

@@ -144,3 +144,72 @@ h1:focus {
     padding: 10px 12px;
     margin: 0 0 6px;
 }
+
+/* Document checklist pills */
+.ft-doc {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    font-size: 0.72rem;
+    font-weight: 500;
+    line-height: 1;
+    padding: 4px 7px 4px 5px;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+
+.ft-doc-held {
+    color: var(--mud-palette-success-darken);
+    background: rgba(22, 163, 74, 0.1);
+}
+
+.ft-doc-missing {
+    color: var(--mud-palette-error);
+    background: rgba(220, 38, 38, 0.1);
+}
+
+/* Stat cards on the dashboard */
+.ft-stat {
+    display: block;
+    height: 100%;
+    color: inherit;
+    text-decoration: none;
+    transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.ft-stat:hover {
+    box-shadow: 0 4px 16px rgba(16, 24, 40, 0.08);
+    transform: translateY(-1px);
+}
+
+.ft-stat-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+}
+
+.ft-clickable-rows tbody tr {
+    cursor: pointer;
+}
+
+/* Number-plate style for registration numbers */
+.ft-reg {
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    font-feature-settings: 'tnum';
+    white-space: nowrap;
+}
+
+.ft-facts td:first-child {
+    color: var(--mud-palette-text-secondary);
+    width: 40%;
+    padding-left: 0 !important;
+}
+
+/* Sentence-case tabs to match the rest of the minimalist UI */
+.mud-tab {
+    text-transform: none !important;
+    letter-spacing: normal !important;
+}

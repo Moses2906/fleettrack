@@ -1,0 +1,32 @@
+@* Colour-coded licence disk status. Colour is never the only signal: there's always an icon and text too. *@
+<MudChip T="string" Size="@Size" Variant="Variant.Text" Color="@Colour" Icon="@StatusIcon" Class="ma-0">@Label</MudChip>
+
+@code {
+    [Parameter, EditorRequired] public DateOnly ExpiryDate { get; set; }
+    [Parameter, EditorRequired] public DateOnly Today { get; set; }
+    [Parameter] public Size Size { get; set; } = Size.Small;
+
+    private LicenceStatus Status => LicenceStatusRules.GetStatus(ExpiryDate, Today);
+    private int Days => ExpiryDate.DayNumber - Today.DayNumber;
+
+    private Color Colour => Status switch
+    {
+        LicenceStatus.Expired => Color.Error,
+        LicenceStatus.DueSoon => Color.Warning,
+        _ => Color.Success,
+    };
+
+    private string StatusIcon => Status switch
+    {
+        LicenceStatus.Expired => Icons.Material.Rounded.Error,
+        LicenceStatus.DueSoon => Icons.Material.Rounded.Schedule,
+        _ => Icons.Material.Rounded.CheckCircle,
+    };
+
+    private string Label => Status switch
+    {
+        LicenceStatus.Expired => Days == -1 ? "Expired yesterday" : $"Expired {-Days} days ago",
+        LicenceStatus.DueSoon => Days switch { 0 => "Expires today", 1 => "Expires tomorrow", _ => $"Due in {Days} days" },
+        _ => "Valid",
+    };
+}

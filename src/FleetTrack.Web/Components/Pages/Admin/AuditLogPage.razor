@@ -10,39 +10,39 @@
 <PageHeader Title="Audit log" Subtitle="Who created, changed, deleted or viewed records, and when. Times are South African time." />
 
 <MudPaper Outlined="true" Elevation="0">
+    <div class="px-4 pt-4 pb-1">
+        <MudGrid Spacing="2">
+            <MudItem xs="12" sm="6" md="4">
+                <MudTextField T="string" Value="search" ValueChanged="OnSearchChanged" DebounceInterval="400"
+                              Placeholder="Search user or record ID" Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Rounded.Search" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" />
+            </MudItem>
+            <MudItem xs="6" sm="3" md="2">
+                <MudSelect T="AuditAction?" Value="action" ValueChanged="OnActionChanged" Label="Action"
+                           Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                    @foreach (var a in Enum.GetValues<AuditAction>())
+                    {
+                        <MudSelectItem T="AuditAction?" Value="a">@a</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="6" sm="3" md="2">
+                <MudSelect T="string" Value="entityType" ValueChanged="OnEntityTypeChanged" Label="Record type"
+                           Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                    @foreach (var t in entityTypes)
+                    {
+                        <MudSelectItem Value="t">@t</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudDateRangePicker DateRange="dateRange" DateRangeChanged="OnDateRangeChanged" Label="Date range"
+                                    Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" DateFormat="dd MMM yyyy" />
+            </MudItem>
+        </MudGrid>
+    </div>
     <MudTable @ref="table" T="AuditLog" ServerData="LoadAsync" Hover="true" Dense="true" Elevation="0"
               Breakpoint="Breakpoint.Sm" RowsPerPage="25" LoadingProgressColor="Color.Primary">
-        <ToolBarContent>
-            <MudGrid Spacing="2" Class="pt-2">
-                <MudItem xs="12" sm="6" md="4">
-                    <MudTextField T="string" Value="search" ValueChanged="OnSearchChanged" DebounceInterval="400"
-                                  Placeholder="Search user or record ID" Adornment="Adornment.Start"
-                                  AdornmentIcon="@Icons.Material.Rounded.Search" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" />
-                </MudItem>
-                <MudItem xs="6" sm="3" md="2">
-                    <MudSelect T="AuditAction?" Value="action" ValueChanged="OnActionChanged" Label="Action"
-                               Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
-                        @foreach (var a in Enum.GetValues<AuditAction>())
-                        {
-                            <MudSelectItem T="AuditAction?" Value="a">@a</MudSelectItem>
-                        }
-                    </MudSelect>
-                </MudItem>
-                <MudItem xs="6" sm="3" md="2">
-                    <MudSelect T="string" Value="entityType" ValueChanged="OnEntityTypeChanged" Label="Record type"
-                               Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
-                        @foreach (var t in entityTypes)
-                        {
-                            <MudSelectItem Value="t">@t</MudSelectItem>
-                        }
-                    </MudSelect>
-                </MudItem>
-                <MudItem xs="12" md="4">
-                    <MudDateRangePicker DateRange="dateRange" DateRangeChanged="OnDateRangeChanged" Label="Date range"
-                                        Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" DateFormat="dd MMM yyyy" />
-                </MudItem>
-            </MudGrid>
-        </ToolBarContent>
         <HeaderContent>
             <MudTh>When</MudTh>
             <MudTh>User</MudTh>
@@ -51,7 +51,7 @@
             <MudTh></MudTh>
         </HeaderContent>
         <RowTemplate>
-            <MudTd DataLabel="When">@ToSaTime(context.TimestampUtc).ToString("dd MMM yyyy HH:mm")</MudTd>
+            <MudTd DataLabel="When">@SouthAfricanTime.ToLocal(context.TimestampUtc).ToString("dd MMM yyyy HH:mm")</MudTd>
             <MudTd DataLabel="User">@(context.UserName ?? "unknown")</MudTd>
             <MudTd DataLabel="Action">
                 <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="@ActionColor(context.Action)">@context.Action</MudChip>
@@ -91,7 +91,6 @@
 </MudPaper>
 
 @code {
-    private static readonly TimeZoneInfo SaZone = TimeZoneInfo.FindSystemTimeZoneById("Africa/Johannesburg");
     private static readonly JsonSerializerOptions PrettyJson = new() { WriteIndented = true };
 
     private MudTable<AuditLog>? table;
@@ -125,9 +124,6 @@
         if (!expanded.Remove(id))
             expanded.Add(id);
     }
-
-    private static DateTime ToSaTime(DateTime utc) =>
-        TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), SaZone);
 
     // User IDs are long GUIDs; the first 8 characters are enough to tell them apart on screen.
     private static string Short(string id) => id.Length > 12 ? id[..8] : id;

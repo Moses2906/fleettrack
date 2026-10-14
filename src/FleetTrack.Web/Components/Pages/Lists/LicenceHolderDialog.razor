@@ -1,0 +1,51 @@
+@inject ReferenceDataService ReferenceData
+
+<MudDialog>
+    <DialogContent>
+        @if (form is not null)
+        {
+            <EditForm Model="form" OnValidSubmit="SaveAsync" id="holder-form">
+                <DataAnnotationsValidator />
+                <MudStack Spacing="3" Style="min-width: min(420px, 80vw)">
+                    <MudRadioGroup T="HolderType" @bind-Value="form.HolderType">
+                        <MudRadio Value="HolderType.Company" Color="Color.Primary">Company</MudRadio>
+                        <MudRadio Value="HolderType.Individual" Color="Color.Primary">Individual</MudRadio>
+                    </MudRadioGroup>
+                    <MudTextField @bind-Value="form.Name" For="() => form.Name" Variant="Variant.Outlined" AutoFocus="true"
+                                  Label="@(form.HolderType == HolderType.Company ? "Company name" : "Full name")" />
+                    <MudTextField @bind-Value="form.Identifier" For="() => form.Identifier" Variant="Variant.Outlined"
+                                  Label="@(form.HolderType == HolderType.Company ? "Company registration number" : "SA ID number")"
+                                  HelperText="@(form.HolderType == HolderType.Company ? "e.g. 2014/208815/07" : "13 digits. Only admins can see the full number.")" />
+                    @if (error is not null)
+                    {
+                        <MudAlert Severity="Severity.Error" Dense="true">@error</MudAlert>
+                    }
+                </MudStack>
+            </EditForm>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => Dialog.Cancel()">Cancel</MudButton>
+        <MudButton ButtonType="ButtonType.Submit" form="holder-form" Variant="Variant.Filled" Color="Color.Primary" Disabled="saving">Save</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+    [Parameter] public int? HolderId { get; set; }
+
+    private LicenceHolderForm? form;
+    private string? error;
+    private bool saving;
+
+    protected override async Task OnInitializedAsync() =>
+        form = HolderId is { } id ? await ReferenceData.GetLicenceHolderFormAsync(id) : new LicenceHolderForm();
+
+    private async Task SaveAsync()
+    {
+        saving = true;
+        var result = await ReferenceData.SaveLicenceHolderAsync(HolderId, form!);
+        saving = false;
+        if (result.Succeeded) Dialog.Close(); else error = result.Error;
+    }
+}
