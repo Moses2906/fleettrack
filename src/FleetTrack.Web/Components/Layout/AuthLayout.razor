@@ -1,0 +1,22 @@
+@inherits LayoutComponentBase
+@inject NavigationManager Navigation
+
+@* Plain, statically rendered layout for sign-in and account pages: they need a real HTTP request
+   (not the interactive WebSocket connection) so they can set and clear the sign-in cookie. *@
+
+<div class="auth-shell">
+    <main class="auth-card @(IsManagePage ? "wide" : "")">
+        <a class="auth-brand" href="">
+            <span class="auth-brand-mark">F</span>
+            FleetTrack
+        </a>
+        @Body
+        <AuthorizeView>
+            <p class="auth-footer"><a href="">← Back to FleetTrack</a></p>
+        </AuthorizeView>
+    </main>
+</div>
+
+@code {
+    private bool IsManagePage => Navigation.ToBaseRelativePath(Navigation.Uri).StartsWith("Account/Manage", StringComparison.OrdinalIgnoreCase);
+}

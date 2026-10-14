@@ -1,0 +1,17 @@
+@* A friendly placeholder for "nothing here yet" or "page not found". *@
+<div class="d-flex flex-column align-center justify-center text-center py-12 px-4">
+    <MudIcon Icon="@Icon" Style="font-size: 3rem" Class="mud-text-secondary mb-3" />
+    <MudText Typo="Typo.h6">@Title</MudText>
+    @if (!string.IsNullOrEmpty(Message))
+    {
+        <MudText Typo="Typo.body2" Class="mud-text-secondary mt-1 mb-4" Style="max-width: 420px">@Message</MudText>
+    }
+    @ChildContent
+</div>
+
+@code {
+    [Parameter] public string Icon { get; set; } = Icons.Material.Rounded.Inbox;
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter] public string? Message { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

@@ -1,0 +1,157 @@
+@page "/admin/audit-log"
+@attribute [Authorize(Policy = nameof(Permission.ViewAuditLog))]
+@using System.Text.Json
+@using FleetTrack.Core.Entities
+@using FleetTrack.Web.Services
+@inject AuditService Audit
+
+<PageTitle>Audit log · FleetTrack</PageTitle>
+
+<PageHeader Title="Audit log" Subtitle="Who created, changed, deleted or viewed records, and when. Times are South African time." />
+
+<MudPaper Outlined="true" Elevation="0">
+    <MudTable @ref="table" T="AuditLog" ServerData="LoadAsync" Hover="true" Dense="true" Elevation="0"
+              Breakpoint="Breakpoint.Sm" RowsPerPage="25" LoadingProgressColor="Color.Primary">
+        <ToolBarContent>
+            <MudGrid Spacing="2" Class="pt-2">
+                <MudItem xs="12" sm="6" md="4">
+                    <MudTextField T="string" Value="search" ValueChanged="OnSearchChanged" DebounceInterval="400"
+                                  Placeholder="Search user or record ID" Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Rounded.Search" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" />
+                </MudItem>
+                <MudItem xs="6" sm="3" md="2">
+                    <MudSelect T="AuditAction?" Value="action" ValueChanged="OnActionChanged" Label="Action"
+                               Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                        @foreach (var a in Enum.GetValues<AuditAction>())
+                        {
+                            <MudSelectItem T="AuditAction?" Value="a">@a</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="6" sm="3" md="2">
+                    <MudSelect T="string" Value="entityType" ValueChanged="OnEntityTypeChanged" Label="Record type"
+                               Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                        @foreach (var t in entityTypes)
+                        {
+                            <MudSelectItem Value="t">@t</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudDateRangePicker DateRange="dateRange" DateRangeChanged="OnDateRangeChanged" Label="Date range"
+                                        Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" DateFormat="dd MMM yyyy" />
+                </MudItem>
+            </MudGrid>
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh>When</MudTh>
+            <MudTh>User</MudTh>
+            <MudTh>Action</MudTh>
+            <MudTh>Record</MudTh>
+            <MudTh></MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="When">@ToSaTime(context.TimestampUtc).ToString("dd MMM yyyy HH:mm")</MudTd>
+            <MudTd DataLabel="User">@(context.UserName ?? "unknown")</MudTd>
+            <MudTd DataLabel="Action">
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="@ActionColor(context.Action)">@context.Action</MudChip>
+            </MudTd>
+            <MudTd DataLabel="Record">@context.EntityType @(context.EntityId is null ? "" : $"#{Short(context.EntityId)}")</MudTd>
+            <MudTd Style="text-align: right">
+                @if (!string.IsNullOrEmpty(context.Details))
+                {
+                    <MudIconButton Size="Size.Small" aria-label="Show details"
+                                   Icon="@(expanded.Contains(context.Id) ? Icons.Material.Rounded.ExpandLess : Icons.Material.Rounded.ExpandMore)"
+                                   OnClick="() => Toggle(context.Id)" />
+                }
+            </MudTd>
+        </RowTemplate>
+        <ChildRowContent>
+            @if (expanded.Contains(context.Id))
+            {
+                <MudTr>
+                    <td colspan="5" class="px-4 pb-3">
+                        @* Razor HTML-encodes this text, so stored values can never run as script (XSS). *@
+                        <pre class="ft-audit-details">@Pretty(context.Details)</pre>
+                        @if (context.IpAddress is not null)
+                        {
+                            <MudText Typo="Typo.caption" Class="mud-text-secondary">IP address: @context.IpAddress</MudText>
+                        }
+                    </td>
+                </MudTr>
+            }
+        </ChildRowContent>
+        <NoRecordsContent>
+            <EmptyState Icon="@Icons.Material.Rounded.History" Title="No audit entries" Message="Nothing matches these filters yet." />
+        </NoRecordsContent>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="[25, 50, 100]" />
+        </PagerContent>
+    </MudTable>
+</MudPaper>
+
+@code {
+    private static readonly TimeZoneInfo SaZone = TimeZoneInfo.FindSystemTimeZoneById("Africa/Johannesburg");
+    private static readonly JsonSerializerOptions PrettyJson = new() { WriteIndented = true };
+
+    private MudTable<AuditLog>? table;
+    private List<string> entityTypes = [];
+    private readonly HashSet<long> expanded = [];
+    private string? search;
+    private AuditAction? action;
+    private string? entityType;
+    private DateRange? dateRange;
+
+    protected override async Task OnInitializedAsync() => entityTypes = await Audit.GetEntityTypesAsync();
+
+    private async Task<TableData<AuditLog>> LoadAsync(TableState state, CancellationToken cancellationToken)
+    {
+        var result = await Audit.SearchAsync(new AuditLogQuery(
+            search, action, entityType,
+            dateRange?.Start is { } start ? DateOnly.FromDateTime(start) : null,
+            dateRange?.End is { } end ? DateOnly.FromDateTime(end) : null,
+            state.Page, state.PageSize));
+        return new TableData<AuditLog> { Items = result.Items, TotalItems = result.TotalCount };
+    }
+
+    private Task OnSearchChanged(string? value) { search = value; return ReloadAsync(); }
+    private Task OnActionChanged(AuditAction? value) { action = value; return ReloadAsync(); }
+    private Task OnEntityTypeChanged(string? value) { entityType = value; return ReloadAsync(); }
+    private Task OnDateRangeChanged(DateRange? value) { dateRange = value; return ReloadAsync(); }
+    private Task ReloadAsync() => table?.ReloadServerData() ?? Task.CompletedTask;
+
+    private void Toggle(long id)
+    {
+        if (!expanded.Remove(id))
+            expanded.Add(id);
+    }
+
+    private static DateTime ToSaTime(DateTime utc) =>
+        TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), SaZone);
+
+    // User IDs are long GUIDs; the first 8 characters are enough to tell them apart on screen.
+    private static string Short(string id) => id.Length > 12 ? id[..8] : id;
+
+    private static Color ActionColor(AuditAction action) => action switch
+    {
+        AuditAction.Create => Color.Success,
+        AuditAction.Update => Color.Info,
+        AuditAction.Delete => Color.Error,
+        _ => Color.Default,
+    };
+
+    private static string Pretty(string? json)
+    {
+        if (string.IsNullOrEmpty(json))
+            return "";
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            return JsonSerializer.Serialize(document.RootElement, PrettyJson);
+        }
+        catch (JsonException)
+        {
+            return json;
+        }
+    }
+}

@@ -1,0 +1,31 @@
+<AuthorizeView Context="auth">
+    <MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" Dense="true" aria-label="Account menu">
+        <ActivatorContent>
+            <MudAvatar Size="Size.Small" Color="Color.Primary" Class="ml-2" Style="cursor: pointer">
+                @Initial(auth.User.DisplayName())
+            </MudAvatar>
+        </ActivatorContent>
+        <ChildContent>
+            <div class="px-4 py-2">
+                <MudText Typo="Typo.body2"><b>@auth.User.DisplayName()</b></MudText>
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">@auth.User.Identity?.Name</MudText>
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                    @(auth.User.IsInRole(Roles.Admin) ? Roles.Admin : Roles.Staff)
+                </MudText>
+            </div>
+            <MudDivider />
+            <MudMenuItem Href="Account/Manage" ForceLoad="true" Icon="@Icons.Material.Rounded.Settings">Account settings</MudMenuItem>
+            @* Signing out is a POST with an anti-forgery token, so another website can't sign you out. *@
+            <form action="Account/Logout" method="post">
+                <AntiforgeryToken />
+                <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Text" FullWidth="true"
+                           StartIcon="@Icons.Material.Rounded.Logout" Class="justify-start px-4">Sign out</MudButton>
+            </form>
+        </ChildContent>
+    </MudMenu>
+</AuthorizeView>
+
+@code {
+    private static string Initial(string? name) =>
+        string.IsNullOrEmpty(name) ? "?" : name[..1].ToUpperInvariant();
+}

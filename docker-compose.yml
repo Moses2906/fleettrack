@@ -1,0 +1,24 @@
+# Local development database: Oracle Database Free 23ai.
+# Start with:  docker compose up -d     (first start takes a minute or two)
+# Passwords come from the .env file next to this one (copy .env.example to .env).
+services:
+  oracle:
+    image: gvenzl/oracle-free:23-slim-faststart
+    container_name: fleettrack-oracle
+    ports:
+      - "1521:1521"
+    environment:
+      ORACLE_PASSWORD: ${ORACLE_ADMIN_PASSWORD}
+      APP_USER: fleettrack
+      APP_USER_PASSWORD: ${ORACLE_APP_PASSWORD}
+    volumes:
+      - oracle-data:/opt/oracle/oradata
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+volumes:
+  oracle-data:

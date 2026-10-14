@@ -1,0 +1,127 @@
+@page "/Account/Login"
+@attribute [AllowAnonymous]
+
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Identity
+@using FleetTrack.Web.Data
+
+@inject SignInManager<ApplicationUser> SignInManager
+@inject ILogger<Login> Logger
+@inject IdentityRedirectManager RedirectManager
+
+<PageTitle>Sign in · FleetTrack</PageTitle>
+
+<h1>Sign in</h1>
+<p class="auth-subtitle">Use your work email and password.</p>
+
+<StatusMessage Message="@errorMessage" />
+<EditForm EditContext="editContext" method="post" OnSubmit="LoginUser" FormName="login">
+    <DataAnnotationsValidator />
+    <div class="form-floating mb-3">
+        <InputText @bind-Value="Input.Email" id="Input.Email" class="form-control" autocomplete="username webauthn" aria-required="true" placeholder="name@company.co.za" />
+        <label for="Input.Email" class="form-label">Email</label>
+        <ValidationMessage For="() => Input.Email" class="validation-message" />
+    </div>
+    <div class="form-floating mb-4">
+        <InputText type="password" @bind-Value="Input.Password" id="Input.Password" class="form-control" autocomplete="current-password" aria-required="true" placeholder="password" />
+        <label for="Input.Password" class="form-label">Password</label>
+        <ValidationMessage For="() => Input.Password" class="validation-message" />
+    </div>
+    <button type="submit" class="w-100 btn btn-lg btn-primary">Sign in</button>
+    <div class="text-center mt-3">
+        <PasskeySubmit Operation="PasskeyOperation.Request" Name="Input.Passkey" EmailName="Input.Email" class="btn btn-link">Sign in with a passkey</PasskeySubmit>
+    </div>
+</EditForm>
+
+<p class="auth-footer">Forgot your password? Ask an administrator to reset it.</p>
+
+@code {
+    private string? errorMessage;
+    private EditContext editContext = default!;
+
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    [SupplyParameterFromForm]
+    private InputModel Input { get; set; } = default!;
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Input ??= new();
+
+        editContext = new EditContext(Input);
+
+        if (HttpMethods.IsGet(HttpContext.Request.Method))
+        {
+            // Clear the existing external cookie to ensure a clean login process
+            await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
+        }
+    }
+
+    public async Task LoginUser()
+    {
+        if (!string.IsNullOrEmpty(Input.Passkey?.Error))
+        {
+            errorMessage = $"Error: {Input.Passkey.Error}";
+            return;
+        }
+
+        SignInResult result;
+        if (!string.IsNullOrEmpty(Input.Passkey?.CredentialJson))
+        {
+            // When performing passkey sign-in, don't perform form validation.
+            result = await SignInManager.PasskeySignInAsync(Input.Passkey.CredentialJson);
+        }
+        else
+        {
+            if (!editContext.Validate())
+            {
+                return;
+            }
+
+            // lockoutOnFailure: true counts wrong passwords, locking the account after 5 (see Program.cs).
+            // There is no "remember me": the sign-in ends when the browser closes, which is safer on shared office PCs.
+            result = await SignInManager.PasswordSignInAsync(Input.Email, Input.Password, isPersistent: false, lockoutOnFailure: true);
+        }
+
+        if (result.Succeeded)
+        {
+            Logger.LogInformation("User signed in.");
+            RedirectManager.RedirectTo(ReturnUrl);
+        }
+        else if (result.RequiresTwoFactor)
+        {
+            RedirectManager.RedirectTo(
+                "Account/LoginWith2fa",
+                new() { ["returnUrl"] = ReturnUrl, ["rememberMe"] = false });
+        }
+        else if (result.IsLockedOut)
+        {
+            Logger.LogWarning("User account locked out.");
+            RedirectManager.RedirectTo("Account/Lockout");
+        }
+        else
+        {
+            // The same message for a wrong password, an unknown email and a disabled account,
+            // so the form can't be used to discover which email addresses have accounts.
+            errorMessage = "Error: Incorrect email or password.";
+        }
+    }
+
+    private sealed class InputModel
+    {
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = "";
+
+        [Required]
+        [DataType(DataType.Password)]
+        public string Password { get; set; } = "";
+
+        public PasskeyInputModel? Passkey { get; set; }
+    }
+}

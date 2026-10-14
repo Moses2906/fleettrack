@@ -1,0 +1,12 @@
+<MudNavMenu Class="pt-4 px-2" Rounded="true" Margin="Margin.Dense" Color="Color.Primary">
+    <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Rounded.SpaceDashboard">Dashboard</MudNavLink>
+
+    @* Admin-only links are hidden here for tidiness, but the pages and services check permissions themselves. *@
+    <AuthorizeView Policy="@nameof(Permission.ManageUsers)">
+        <MudText Typo="Typo.overline" Class="px-4 mt-6 mb-1 mud-text-secondary">Administration</MudText>
+        <MudNavLink Href="admin/users" Icon="@Icons.Material.Rounded.ManageAccounts">Users</MudNavLink>
+    </AuthorizeView>
+    <AuthorizeView Policy="@nameof(Permission.ViewAuditLog)">
+        <MudNavLink Href="admin/audit-log" Icon="@Icons.Material.Rounded.History">Audit log</MudNavLink>
+    </AuthorizeView>
+</MudNavMenu>

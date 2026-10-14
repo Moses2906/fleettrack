@@ -1,0 +1,85 @@
+@using System.ComponentModel.DataAnnotations
+@using FleetTrack.Web.Services
+@inject UserAdminService UserAdmin
+
+<MudDialog>
+    <DialogContent>
+        <EditForm Model="model" OnValidSubmit="SaveAsync" id="user-form">
+            <DataAnnotationsValidator />
+            <MudStack Spacing="3" Style="min-width: min(420px, 80vw)">
+                <MudTextField @bind-Value="model.FullName" For="() => model.FullName" Label="Full name" Variant="Variant.Outlined" AutoFocus="true" />
+                <MudTextField @bind-Value="model.Email" For="() => model.Email" Label="Email" InputType="InputType.Email" Variant="Variant.Outlined" />
+                <MudSelect T="string" @bind-Value="model.Role" Label="Role" Variant="Variant.Outlined">
+                    <MudSelectItem Value="@Roles.Staff">Staff: view records, add services, view documents</MudSelectItem>
+                    <MudSelectItem Value="@Roles.Admin">Admin: full access, including deleting and users</MudSelectItem>
+                </MudSelect>
+                @if (IsNew)
+                {
+                    <PasswordField @bind-Value="model.Password" />
+                }
+                @if (error is not null)
+                {
+                    <MudAlert Severity="Severity.Error" Dense="true">@error</MudAlert>
+                }
+            </MudStack>
+        </EditForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => Dialog.Cancel()">Cancel</MudButton>
+        <MudButton ButtonType="ButtonType.Submit" form="user-form" Variant="Variant.Filled" Color="Color.Primary" Disabled="saving">
+            @(IsNew ? "Add user" : "Save")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+    [Parameter] public bool IsNew { get; set; }
+    [Parameter] public UserSummary? Existing { get; set; }
+
+    private readonly Model model = new();
+    private string? error;
+    private bool saving;
+
+    protected override void OnInitialized()
+    {
+        if (Existing is not null)
+        {
+            model.FullName = Existing.FullName;
+            model.Email = Existing.Email;
+            model.Role = Existing.Role;
+        }
+        else
+        {
+            model.Password = UserAdminService.GeneratePassword();
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        saving = true;
+        error = null;
+        var form = new UserForm(model.FullName, model.Email, model.Role, model.Password);
+        var result = IsNew ? await UserAdmin.CreateAsync(form) : await UserAdmin.UpdateAsync(Existing!.Id, form);
+        saving = false;
+
+        if (result.Succeeded)
+            Dialog.Close();
+        else
+            error = result.Error;
+    }
+
+    private sealed class Model
+    {
+        [Required, StringLength(100)]
+        public string FullName { get; set; } = "";
+
+        [Required, EmailAddress, StringLength(256)]
+        public string Email { get; set; } = "";
+
+        [Required]
+        public string Role { get; set; } = Roles.Staff;
+
+        public string? Password { get; set; }
+    }
+}

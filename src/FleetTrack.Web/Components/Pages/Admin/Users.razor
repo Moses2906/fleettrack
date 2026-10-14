@@ -1,0 +1,151 @@
+@page "/admin/users"
+@attribute [Authorize(Policy = nameof(Permission.ManageUsers))]
+@using FleetTrack.Web.Services
+@inject UserAdminService UserAdmin
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+
+<PageTitle>Users · FleetTrack</PageTitle>
+
+<PageHeader Title="Users" Subtitle="Who can sign in to FleetTrack, and what they're allowed to do.">
+    <Actions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.PersonAdd"
+                   OnClick="AddUserAsync">Add user</MudButton>
+    </Actions>
+</PageHeader>
+
+<MudPaper Outlined="true" Elevation="0">
+    <MudTable Items="users" Loading="users is null" Hover="true" Breakpoint="Breakpoint.Sm" Elevation="0"
+              Filter="Matches" LoadingProgressColor="Color.Primary">
+        <ToolBarContent>
+            <MudTextField @bind-Value="search" Placeholder="Search by name or email" Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Rounded.Search" Immediate="true" Variant="Variant.Outlined"
+                          Margin="Margin.Dense" Class="mt-0" Style="max-width: 360px" Clearable="true" />
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh>Name</MudTh>
+            <MudTh>Email</MudTh>
+            <MudTh>Role</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh Style="text-align: right">Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Name">@context.FullName</MudTd>
+            <MudTd DataLabel="Email">@context.Email</MudTd>
+            <MudTd DataLabel="Role">
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Text"
+                         Color="@(context.Role == Roles.Admin ? Color.Primary : Color.Default)">@context.Role</MudChip>
+            </MudTd>
+            <MudTd DataLabel="Status">
+                @if (!context.IsActive)
+                {
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Default" Icon="@Icons.Material.Rounded.Block">Disabled</MudChip>
+                }
+                else if (context.IsLockedOut)
+                {
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Warning" Icon="@Icons.Material.Rounded.Lock">Locked</MudChip>
+                }
+                else
+                {
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Success" Icon="@Icons.Material.Rounded.CheckCircle">Active</MudChip>
+                }
+            </MudTd>
+            <MudTd DataLabel="Actions" Style="text-align: right">
+                <MudTooltip Text="Edit">
+                    <MudIconButton Icon="@Icons.Material.Rounded.Edit" Size="Size.Small" OnClick="() => EditUserAsync(context)" aria-label="Edit" />
+                </MudTooltip>
+                <MudTooltip Text="Reset password">
+                    <MudIconButton Icon="@Icons.Material.Rounded.Key" Size="Size.Small" OnClick="() => ResetPasswordAsync(context)" aria-label="Reset password" />
+                </MudTooltip>
+                <MudTooltip Text="@(context.IsActive ? "Disable" : "Enable")">
+                    <MudIconButton Icon="@(context.IsActive ? Icons.Material.Rounded.Block : Icons.Material.Rounded.CheckCircleOutline)"
+                                   Size="Size.Small" OnClick="() => ToggleActiveAsync(context)" aria-label="@(context.IsActive ? "Disable" : "Enable")" />
+                </MudTooltip>
+                <MudTooltip Text="Delete">
+                    <MudIconButton Icon="@Icons.Material.Rounded.DeleteOutline" Size="Size.Small" Color="Color.Error"
+                                   OnClick="() => DeleteAsync(context)" aria-label="Delete" />
+                </MudTooltip>
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <EmptyState Icon="@Icons.Material.Rounded.PersonSearch" Title="No users found" Message="Try a different search." />
+        </NoRecordsContent>
+    </MudTable>
+</MudPaper>
+
+@code {
+    private List<UserSummary>? users;
+    private string search = "";
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync() => users = await UserAdmin.ListAsync();
+
+    private bool Matches(UserSummary user) =>
+        string.IsNullOrWhiteSpace(search)
+        || user.FullName.Contains(search, StringComparison.OrdinalIgnoreCase)
+        || user.Email.Contains(search, StringComparison.OrdinalIgnoreCase);
+
+    private async Task AddUserAsync()
+    {
+        var parameters = new DialogParameters<UserDialog> { { d => d.IsNew, true } };
+        var dialog = await Dialogs.ShowAsync<UserDialog>("Add user", parameters);
+        if ((await dialog.Result) is { Canceled: false })
+        {
+            Snackbar.Add("User added. Pass the password on to them securely.", Severity.Success);
+            await LoadAsync();
+        }
+    }
+
+    private async Task EditUserAsync(UserSummary user)
+    {
+        var parameters = new DialogParameters<UserDialog> { { d => d.Existing, user } };
+        var dialog = await Dialogs.ShowAsync<UserDialog>("Edit user", parameters);
+        if ((await dialog.Result) is { Canceled: false })
+        {
+            Snackbar.Add("User updated.", Severity.Success);
+            await LoadAsync();
+        }
+    }
+
+    private async Task ResetPasswordAsync(UserSummary user)
+    {
+        var parameters = new DialogParameters<ResetPasswordDialog> { { d => d.User, user } };
+        var dialog = await Dialogs.ShowAsync<ResetPasswordDialog>("Reset password", parameters);
+        if ((await dialog.Result) is { Canceled: false })
+        {
+            Snackbar.Add("Password reset. Pass it on to them securely.", Severity.Success);
+            await LoadAsync();
+        }
+    }
+
+    private async Task ToggleActiveAsync(UserSummary user)
+    {
+        if (user.IsActive)
+        {
+            var confirmed = await Dialogs.ShowMessageBoxAsync("Disable user",
+                $"{user.FullName} won't be able to sign in, and any open session ends within 5 minutes. You can enable the account again later.",
+                yesText: "Disable", cancelText: "Cancel");
+            if (confirmed != true)
+                return;
+        }
+
+        Report(await UserAdmin.SetActiveAsync(user.Id, !user.IsActive), user.IsActive ? "User disabled." : "User enabled.");
+        await LoadAsync();
+    }
+
+    private async Task DeleteAsync(UserSummary user)
+    {
+        var confirmed = await Dialogs.ShowMessageBoxAsync("Delete user",
+            $"Permanently delete {user.FullName}'s account? Records they created are kept. Consider disabling the account instead.",
+            yesText: "Delete", cancelText: "Cancel");
+        if (confirmed != true)
+            return;
+
+        Report(await UserAdmin.DeleteAsync(user.Id), "User deleted.");
+        await LoadAsync();
+    }
+
+    private void Report(OperationResult result, string successMessage) =>
+        Snackbar.Add(result.Succeeded ? successMessage : result.Error ?? "Something went wrong.", result.Succeeded ? Severity.Success : Severity.Error);
+}

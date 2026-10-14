@@ -1,0 +1,14 @@
+@page "/"
+@attribute [Authorize(Policy = nameof(Permission.ViewRecords))]
+
+<PageTitle>Dashboard · FleetTrack</PageTitle>
+
+<AuthorizeView Context="auth">
+    <PageHeader Title="@($"Welcome, {auth.User.DisplayName()}")"
+                Subtitle="@($"Signed in as {(auth.User.IsInRole(Roles.Admin) ? "an Admin" : "Staff")}.")" />
+</AuthorizeView>
+
+<MudPaper Class="pa-2" Elevation="0" Outlined="true">
+    <EmptyState Icon="@Icons.Material.Rounded.SpaceDashboard" Title="Dashboard coming in Phase 3"
+                Message="Counts of expired disks, disks due within 30 days and missing documents will appear here." />
+</MudPaper>

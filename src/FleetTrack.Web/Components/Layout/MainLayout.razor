@@ -1,0 +1,62 @@
+@inherits LayoutComponentBase
+
+<MudThemeProvider @ref="themeProvider" Theme="FleetTrackTheme.Theme" @bind-IsDarkMode="isDarkMode" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="0" Class="ft-appbar">
+        <MudIconButton Icon="@Icons.Material.Rounded.Menu" Color="Color.Inherit" Edge="Edge.Start"
+                       OnClick="() => drawerOpen = !drawerOpen" aria-label="Toggle navigation" />
+        <MudText Typo="Typo.h6" Class="ml-2">FleetTrack</MudText>
+        <MudSpacer />
+        <MudTooltip Text="@(isDarkMode ? "Light mode" : "Dark mode")">
+            <MudIconButton Icon="@(isDarkMode ? Icons.Material.Rounded.LightMode : Icons.Material.Rounded.DarkMode)"
+                           Color="Color.Inherit" OnClick="() => isDarkMode = !isDarkMode" aria-label="Toggle dark mode" />
+        </MudTooltip>
+        <UserMenu />
+    </MudAppBar>
+
+    <MudDrawer @bind-Open="drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="0"
+               Variant="DrawerVariant.Responsive" Class="ft-drawer">
+        <NavMenu />
+    </MudDrawer>
+
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-6 px-4 px-sm-6">
+            <ErrorBoundary @ref="errorBoundary">
+                <ChildContent>@Body</ChildContent>
+                <ErrorContent Context="exception">
+                    <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mb-4">
+                        Something went wrong while showing this page. Please try again; if it keeps happening, tell an administrator.
+                    </MudAlert>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => errorBoundary?.Recover()">Try again</MudButton>
+                </ErrorContent>
+            </ErrorBoundary>
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">🗙</span>
+</div>
+
+@code {
+    private MudThemeProvider? themeProvider;
+    private ErrorBoundary? errorBoundary;
+    private bool drawerOpen = true;
+    private bool isDarkMode;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && themeProvider is not null)
+        {
+            // Start in whatever mode the phone or computer is set to.
+            isDarkMode = await themeProvider.GetSystemDarkModeAsync();
+            StateHasChanged();
+        }
+    }
+}
