@@ -213,3 +213,14 @@ h1:focus {
     text-transform: none !important;
     letter-spacing: normal !important;
 }
+
+.ft-dropzone {
+    cursor: pointer;
+    border-style: dashed !important;
+    border-width: 2px !important;
+    transition: background-color 0.15s ease;
+}
+
+.ft-dropzone:hover {
+    background-color: var(--mud-palette-action-default-hover);
+}

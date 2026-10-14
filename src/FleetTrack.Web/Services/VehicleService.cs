@@ -2,6 +2,7 @@ using FleetTrack.Core.Entities;
 using FleetTrack.Core.Rules;
 using FleetTrack.Core.Security;
 using FleetTrack.Web.Data;
+using FleetTrack.Web.Documents;
 using FleetTrack.Web.Security;
 using Microsoft.EntityFrameworkCore;
 
@@ -29,6 +30,14 @@ public record VehicleRow(
     public string MakeAndModel => $"{Make} {Model}";
     public int MissingDocumentCount => (HasRc1 ? 0 : 1) + (HasBrnc ? 0 : 1) + (HasProxyLetter ? 0 : 1) + (HasProxyId ? 0 : 1);
     public bool HasAllDocuments => MissingDocumentCount == 0;
+
+    public bool HasDocument(DocumentType type) => type switch
+    {
+        DocumentType.Rc1 => HasRc1,
+        DocumentType.Brnc => HasBrnc,
+        DocumentType.ProxyLetter => HasProxyLetter,
+        _ => HasProxyId,
+    };
     public LicenceStatus StatusOn(DateOnly today) => LicenceStatusRules.GetStatus(LicenceExpiryDate, today);
 }
 
@@ -53,6 +62,7 @@ public record DashboardSummary(
 public class VehicleService(
     IDbContextFactory<ApplicationDbContext> dbFactory,
     PermissionService permissions,
+    DocumentService documents,
     TimeProvider clock)
 {
     public DateOnly Today => SouthAfricanTime.Today(clock);
@@ -194,8 +204,14 @@ public class VehicleService(
         if (vehicle is null)
             return OperationResult.Ok;
 
+        // Note the stored files first: once the rows are gone we no longer know their names.
+        var storedFiles = await db.VehicleDocuments.Where(d => d.VehicleId == id).Select(d => d.StoredFileName).ToListAsync();
+
         db.Vehicles.Remove(vehicle);
         await db.SaveChangesAsync();
+
+        // The ID copies themselves must go too, not just the database rows.
+        documents.DeleteFiles(storedFiles);
         return OperationResult.Ok;
     }
 

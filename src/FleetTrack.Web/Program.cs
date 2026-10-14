@@ -3,6 +3,7 @@ using FleetTrack.Web.Components;
 using FleetTrack.Web.Components.Account;
 using FleetTrack.Web.Data;
 using FleetTrack.Web.Data.Seeding;
+using FleetTrack.Web.Documents;
 using FleetTrack.Web.Security;
 using FleetTrack.Web.Services;
 using Microsoft.AspNetCore.Components.Authorization;
@@ -116,6 +117,12 @@ builder.Services.AddScoped<UserAdminService>();
 builder.Services.AddScoped<VehicleService>();
 builder.Services.AddScoped<ReferenceDataService>();
 
+// Uploaded documents are stored outside wwwroot (see DocumentStorageOptions).
+var storageOptions = builder.Configuration.GetSection("Storage").Get<DocumentStorageOptions>() ?? new DocumentStorageOptions();
+builder.Services.AddSingleton<IDocumentStorage>(new LocalDocumentStorage(
+    Path.Combine(builder.Environment.ContentRootPath, storageOptions.DocumentsPath)));
+builder.Services.AddScoped<DocumentService>();
+
 builder.Services.AddHsts(options =>
 {
     options.MaxAge = TimeSpan.FromDays(365);
@@ -180,5 +187,6 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode(options => options.ContentSecurityFrameAncestorsPolicy = null);
 
 app.MapAdditionalIdentityEndpoints();
+app.MapDocumentEndpoints();
 
 app.Run();

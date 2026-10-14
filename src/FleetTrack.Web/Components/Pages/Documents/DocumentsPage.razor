@@ -1,0 +1,121 @@
+@page "/documents"
+@attribute [Authorize(Policy = nameof(Permission.ViewDocuments))]
+@inject DocumentService Documents
+@inject NavigationManager Navigation
+
+<PageTitle>Documents · FleetTrack</PageTitle>
+
+<PageHeader Title="Documents" Subtitle="Which RC1, BRNC, proxy letter and proxy ID copies are stored for each vehicle. Click a vehicle to upload or view its documents." />
+
+@if (rows is not null)
+{
+    <MudGrid Spacing="4" Class="mb-2">
+        <MudItem xs="12" sm="4">
+            <MudPaper Outlined="true" Elevation="0" Class="pa-4">
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">Copies stored</MudText>
+                <MudText Typo="Typo.h4" Class="mt-1">@Count(DocumentSlotState.Uploaded) <span class="mud-text-secondary" style="font-size: 1rem">of @(rows.Count * 4)</span></MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="6" sm="4">
+            <MudPaper Outlined="true" Elevation="0" Class="pa-4">
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">Paper only (not uploaded)</MudText>
+                <MudText Typo="Typo.h4" Class="mt-1">@Count(DocumentSlotState.TickedOnly)</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="6" sm="4">
+            <MudPaper Outlined="true" Elevation="0" Class="pa-4">
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">Missing</MudText>
+                <MudText Typo="Typo.h4" Class="mt-1" Style="color: var(--mud-palette-error)">@Count(DocumentSlotState.Missing)</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+<MudPaper Outlined="true" Elevation="0">
+    <div class="px-4 pt-4 pb-1">
+        <MudGrid Spacing="2">
+            <MudItem xs="12" sm="6" md="4">
+                <MudTextField @bind-Value="search" Immediate="true" Clearable="true" Variant="Variant.Outlined" Margin="Margin.Dense"
+                              Placeholder="Search registration or make" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Rounded.Search" />
+            </MudItem>
+            <MudItem xs="12" sm="6" md="4" Class="d-flex align-center">
+                <MudSwitch @bind-Value="incompleteOnly" Color="Color.Primary" Label="Only vehicles without all four copies" />
+            </MudItem>
+        </MudGrid>
+    </div>
+    <MudTable Items="rows" Filter="Matches" Loading="rows is null" Hover="true" Elevation="0" Breakpoint="Breakpoint.Sm" T="VehicleDocumentStatus"
+              RowsPerPage="50" Class="ft-clickable-rows" OnRowClick="@((TableRowClickEventArgs<VehicleDocumentStatus> e) => Open(e.Item!))">
+        <HeaderContent>
+            <MudTh>Registration</MudTh>
+            <MudTh>Vehicle</MudTh>
+            @foreach (var type in DocumentTypes.All)
+            {
+                <MudTh Style="text-align: center">@DocumentTypes.Name(type)</MudTh>
+            }
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Registration"><span class="ft-reg">@context.RegistrationNumber</span></MudTd>
+            <MudTd DataLabel="Vehicle">@context.MakeAndModel</MudTd>
+            @foreach (var type in DocumentTypes.All)
+            {
+                var state = context.Slots[type];
+                <MudTd DataLabel="@DocumentTypes.Name(type)" Style="text-align: center">
+                    <MudTooltip Text="@StateText(state)">
+                        <MudIcon Icon="@StateIcon(state)" Color="@StateColour(state)" Size="Size.Small" aria-label="@StateText(state)" />
+                    </MudTooltip>
+                </MudTd>
+            }
+        </RowTemplate>
+        <NoRecordsContent>
+            <EmptyState Icon="@Icons.Material.Rounded.FolderOff" Title="No vehicles match" />
+        </NoRecordsContent>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="[25, 50, 100]" />
+        </PagerContent>
+    </MudTable>
+    <div class="d-flex flex-wrap gap-4 pa-4 mud-text-secondary" style="font-size: 0.85rem">
+        @foreach (var state in Enum.GetValues<DocumentSlotState>())
+        {
+            <span class="d-flex align-center gap-1"><MudIcon Icon="@StateIcon(state)" Color="@StateColour(state)" Size="Size.Small" /> @StateText(state)</span>
+        }
+    </div>
+</MudPaper>
+
+@code {
+    private List<VehicleDocumentStatus>? rows;
+    private string search = "";
+    private bool incompleteOnly;
+
+    protected override async Task OnInitializedAsync() => rows = await Documents.OverviewAsync();
+
+    private bool Matches(VehicleDocumentStatus row) =>
+        (!incompleteOnly || row.UploadedCount < 4)
+        && (string.IsNullOrWhiteSpace(search)
+            || RegistrationNumbers.ToKey(row.RegistrationNumber).Contains(RegistrationNumbers.ToKey(search))
+            || row.MakeAndModel.Contains(search, StringComparison.OrdinalIgnoreCase));
+
+    private int Count(DocumentSlotState state) => rows?.Sum(r => r.Slots.Values.Count(s => s == state)) ?? 0;
+
+    private void Open(VehicleDocumentStatus row) => Navigation.NavigateTo($"vehicles/{row.VehicleId}?tab=documents");
+
+    private static string StateIcon(DocumentSlotState state) => state switch
+    {
+        DocumentSlotState.Uploaded => Icons.Material.Rounded.CloudDone,
+        DocumentSlotState.TickedOnly => Icons.Material.Rounded.Inventory2,
+        _ => Icons.Material.Rounded.Close,
+    };
+
+    private static Color StateColour(DocumentSlotState state) => state switch
+    {
+        DocumentSlotState.Uploaded => Color.Success,
+        DocumentSlotState.TickedOnly => Color.Default, // not a problem, so kept quiet; red "missing" stands out
+        _ => Color.Error,
+    };
+
+    private static string StateText(DocumentSlotState state) => state switch
+    {
+        DocumentSlotState.Uploaded => "Copy stored",
+        DocumentSlotState.TickedOnly => "Paper only, not uploaded",
+        _ => "Missing",
+    };
+}

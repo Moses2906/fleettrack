@@ -1,0 +1,105 @@
+@using Microsoft.AspNetCore.Components.Forms
+@inject DocumentService Documents
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3" Style="min-width: min(440px, 80vw)">
+            @if (Replacing)
+            {
+                <MudAlert Severity="Severity.Info" Dense="true">The new file replaces the current @DocumentTypes.Name(Type), which is then deleted.</MudAlert>
+            }
+            <MudFileUpload T="IBrowserFile" FilesChanged="OnFileChosen" Accept=".pdf,.jpg,.jpeg,.png" MaximumFileCount="1">
+                <CustomContent>
+                    <MudPaper Outlined="true" Elevation="0" Class="pa-6 d-flex flex-column align-center text-center ft-dropzone"
+                              @onclick="context.OpenFilePickerAsync">
+                        <MudIcon Icon="@(file is null ? Icons.Material.Rounded.UploadFile : Icons.Material.Rounded.Description)" Size="Size.Large" Color="Color.Primary" />
+                        @if (file is null)
+                        {
+                            <MudText Class="mt-2"><b>Choose a file</b></MudText>
+                            <MudText Typo="Typo.caption" Class="mud-text-secondary">PDF, JPG or PNG · up to 10 MB</MudText>
+                        }
+                        else
+                        {
+                            <MudText Class="mt-2"><b>@file.Name</b></MudText>
+                            <MudText Typo="Typo.caption" Class="mud-text-secondary">@DocumentFileRules.FormatSize(file.Size) · click to choose a different file</MudText>
+                        }
+                    </MudPaper>
+                </CustomContent>
+            </MudFileUpload>
+            <MudTextField @bind-Value="notes" Label="Notes (optional)" Variant="Variant.Outlined" Lines="2" MaxLength="2000"
+                          HelperText="e.g. certified copy, original kept in the office safe" />
+            @if (error is not null)
+            {
+                <MudAlert Severity="Severity.Error" Dense="true">@error</MudAlert>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => Dialog.Cancel()" Disabled="uploading">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="UploadAsync" Disabled="file is null || uploading">
+            @if (uploading)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                <span>Uploading…</span>
+            }
+            else
+            {
+                <span>Upload</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+    [Parameter, EditorRequired] public int VehicleId { get; set; }
+    [Parameter, EditorRequired] public DocumentType Type { get; set; }
+    [Parameter] public bool Replacing { get; set; }
+    [Parameter] public string? ExistingNotes { get; set; }
+
+    private IBrowserFile? file;
+    private string? notes;
+    private string? error;
+    private bool uploading;
+
+    protected override void OnInitialized() => notes = ExistingNotes;
+
+    private void OnFileChosen(IBrowserFile? chosen)
+    {
+        error = null;
+        file = chosen;
+        // A quick, friendly check in the browser. The server checks size and real file type again.
+        if (file is not null && !DocumentFileRules.HasAllowedExtension(file.Name))
+            error = "Only PDF, JPG and PNG files can be uploaded.";
+        else if (file?.Size > DocumentFileRules.MaxBytes)
+            error = $"That file is {DocumentFileRules.FormatSize(file.Size)}. The limit is 10 MB.";
+        if (error is not null)
+            file = null;
+    }
+
+    private async Task UploadAsync()
+    {
+        if (file is null)
+            return;
+        uploading = true;
+        error = null;
+        try
+        {
+            // The stream refuses to deliver more than 10 MB, whatever size the browser claimed.
+            await using var stream = file.OpenReadStream(DocumentFileRules.MaxBytes);
+            var result = await Documents.UploadAsync(VehicleId, Type, stream, file.Name, notes);
+            if (result.Succeeded)
+                Dialog.Close();
+            else
+                error = result.Error;
+        }
+        catch (IOException)
+        {
+            error = "The upload was interrupted or the file is too large. Please try again.";
+        }
+        finally
+        {
+            uploading = false;
+        }
+    }
+}

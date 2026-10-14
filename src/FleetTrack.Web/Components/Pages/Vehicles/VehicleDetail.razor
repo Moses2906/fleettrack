@@ -85,13 +85,13 @@ else
                     }
                 </div>
                 <MudText Typo="Typo.body2" Class="mud-text-secondary mb-2">
-                    @(canEdit ? "Tick a document when you have it. Uploading a copy (Phase 4) ticks it automatically." : "Which documents we have on file for this vehicle.")
+                    @(canEdit ? "Tick a document when you have it. Uploading a copy below ticks it automatically." : "Which documents we have on file for this vehicle.")
                 </MudText>
                 @foreach (var (type, name) in DocumentNames)
                 {
                     <div class="d-flex align-center justify-space-between py-1">
                         <MudText>@name</MudText>
-                        <MudSwitch T="bool" Value="HasDocument(type)" ValueChanged="held => SetDocumentAsync(type, held)"
+                        <MudSwitch T="bool" Value="v.HasDocument(type)" ValueChanged="held => SetDocumentAsync(type, held)"
                                    Color="Color.Success" UncheckedColor="Color.Error" ReadOnly="!canEdit"
                                    aria-label="@name" />
                     </div>
@@ -118,10 +118,9 @@ else
 
         <MudItem xs="12">
             <MudPaper Outlined="true" Elevation="0">
-                <MudTabs Elevation="0" ApplyEffectsToContainer="true" TabPanelsClass="pa-2">
+                <MudTabs Elevation="0" ApplyEffectsToContainer="true" TabPanelsClass="pa-2" @bind-ActivePanelIndex="activeTab">
                     <MudTabPanel Text="Documents" Icon="@Icons.Material.Rounded.Description">
-                        <EmptyState Icon="@Icons.Material.Rounded.UploadFile" Title="Document copies arrive in Phase 4"
-                                    Message="Upload and view RC1, BRNC, proxy letter and proxy ID copies here." />
+                        <VehicleDocumentsPanel Vehicle="vehicle" OnChanged="LoadAsync" />
                     </MudTabPanel>
                     <MudTabPanel Text="Services" Icon="@Icons.Material.Rounded.Build">
                         <EmptyState Icon="@Icons.Material.Rounded.Build" Title="Service log arrives in Phase 5" />
@@ -137,6 +136,11 @@ else
 
 @code {
     [Parameter] public int Id { get; set; }
+
+    /// <summary>?tab=documents opens the Documents tab directly (used by the Documents overview page).</summary>
+    [SupplyParameterFromQuery(Name = "tab")] public string? Tab { get; set; }
+
+    private int activeTab;
 
     private static readonly (DocumentType Type, string Name)[] DocumentNames =
     [
@@ -156,6 +160,7 @@ else
         // Only used to decide which buttons to show; the service checks again on every action.
         canEdit = await Permissions.HasAsync(Permission.EditRecords);
         canDelete = await Permissions.HasAsync(Permission.DeleteRecords);
+        activeTab = Tab?.ToLowerInvariant() switch { "services" => 1, "renewals" => 2, _ => 0 };
         await LoadAsync();
     }
 
@@ -164,14 +169,6 @@ else
         vehicle = await Vehicles.GetAsync(Id);
         notFound = vehicle is null;
     }
-
-    private bool HasDocument(DocumentType type) => type switch
-    {
-        DocumentType.Rc1 => vehicle!.Row.HasRc1,
-        DocumentType.Brnc => vehicle!.Row.HasBrnc,
-        DocumentType.ProxyLetter => vehicle!.Row.HasProxyLetter,
-        _ => vehicle!.Row.HasProxyId,
-    };
 
     private async Task SetDocumentAsync(DocumentType type, bool held)
     {

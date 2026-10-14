@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using FleetTrack.Web.Data;
+using FleetTrack.Web.Documents;
 using FleetTrack.Web.Security;
 using FleetTrack.Web.Services;
 using Microsoft.AspNetCore.Components.Authorization;
@@ -19,15 +20,26 @@ internal sealed class TestServices : IAsyncDisposable
     private readonly ServiceProvider _root;
     private readonly AsyncServiceScope _scope;
 
-    private TestServices(ServiceProvider root)
+    /// <summary>A temporary folder standing in for the document store; deleted when the test ends.</summary>
+    public string StoragePath { get; }
+
+    private readonly string _databaseName;
+    private readonly bool _ownsStorage;
+
+    private TestServices(ServiceProvider root, string storagePath, string databaseName, bool ownsStorage)
     {
         _root = root;
         _scope = root.CreateAsyncScope();
+        StoragePath = storagePath;
+        _databaseName = databaseName;
+        _ownsStorage = ownsStorage;
     }
 
-    public static async Task<TestServices> CreateAsync(string role, string? databaseName = null)
+    /// <param name="shareWith">Another instance whose database and document folder this one should use,
+    /// e.g. to have an admin upload a file and a staff member open it.</param>
+    public static async Task<TestServices> CreateAsync(string role, TestServices? shareWith = null)
     {
-        databaseName ??= Guid.NewGuid().ToString();
+        var databaseName = shareWith?._databaseName ?? Guid.NewGuid().ToString();
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddFleetTrackAuthorization();
@@ -41,8 +53,11 @@ internal sealed class TestServices : IAsyncDisposable
         services.AddScoped<VehicleService>();
         services.AddScoped<ReferenceDataService>();
         services.AddScoped<AuditService>();
+        var storagePath = shareWith?.StoragePath ?? Path.Combine(Path.GetTempPath(), "fleettrack-tests", Guid.NewGuid().ToString("N"));
+        services.AddSingleton<IDocumentStorage>(new LocalDocumentStorage(storagePath));
+        services.AddScoped<DocumentService>();
 
-        var result = new TestServices(services.BuildServiceProvider());
+        var result = new TestServices(services.BuildServiceProvider(), storagePath, databaseName, ownsStorage: shareWith is null);
         await using var db = await result.CreateDbAsync();
         await db.Database.EnsureCreatedAsync();
         return result;
@@ -53,10 +68,14 @@ internal sealed class TestServices : IAsyncDisposable
     public Task<ApplicationDbContext> CreateDbAsync() =>
         Get<IDbContextFactory<ApplicationDbContext>>().CreateDbContextAsync();
 
+    public string[] StoredFiles() => Directory.GetFiles(StoragePath);
+
     public async ValueTask DisposeAsync()
     {
         await _scope.DisposeAsync();
         await _root.DisposeAsync();
+        if (_ownsStorage && Directory.Exists(StoragePath))
+            Directory.Delete(StoragePath, recursive: true);
     }
 
     private sealed class SignedInAs(string role) : AuthenticationStateProvider

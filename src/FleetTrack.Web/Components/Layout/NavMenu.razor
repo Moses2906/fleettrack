@@ -1,6 +1,9 @@
 <MudNavMenu Class="pt-4 px-2" Rounded="true" Margin="Margin.Dense" Color="Color.Primary">
     <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Rounded.SpaceDashboard">Dashboard</MudNavLink>
     <MudNavLink Href="vehicles" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Rounded.DirectionsCar">Vehicles</MudNavLink>
+    <AuthorizeView Policy="@nameof(Permission.ViewDocuments)">
+        <MudNavLink Href="documents" Icon="@Icons.Material.Rounded.Description">Documents</MudNavLink>
+    </AuthorizeView>
     <MudNavLink Href="lists" Icon="@Icons.Material.Rounded.ListAlt">Drivers & owners</MudNavLink>
 
     @* Admin-only links are hidden here for tidiness, but the pages and services check permissions themselves. *@

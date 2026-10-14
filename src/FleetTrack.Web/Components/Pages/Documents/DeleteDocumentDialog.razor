@@ -1,0 +1,21 @@
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="2" Style="max-width: 440px">
+            <MudText Typo="Typo.body2">Permanently delete the stored copy of the <b>@DocumentTypes.Name(Type)</b> (<i>@FileName</i>)? This can't be undone.</MudText>
+            <MudCheckBox @bind-Value="untick" Color="Color.Primary"
+                         Label="Also untick it on the checklist (leave ticked if the paper copy is still in the office)" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => Dialog.Cancel()">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="() => Dialog.Close(untick)">Delete copy</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+    [Parameter, EditorRequired] public DocumentType Type { get; set; }
+    [Parameter, EditorRequired] public string FileName { get; set; } = "";
+
+    private bool untick = true;
+}
