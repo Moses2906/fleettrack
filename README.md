@@ -9,6 +9,8 @@
 
 ![Dashboard](docs/screenshots/dashboard.png)
 
+> **Want to try it?** Follow [Try it out](#try-it-out) to get FleetTrack running on your computer in about 15 minutes, with demo data and logins ready to go.
+
 > **All data in this repository is fictional.** Companies, people, ID numbers, registration numbers and documents are made up for demonstration. No real company data is ever committed.
 
 ---
@@ -18,6 +20,7 @@
 - [Features](#features)
 - [Security and POPIA](#security-and-popia)
 - [Tech stack](#tech-stack)
+- [Try it out](#try-it-out)
 - [Getting started](#getting-started)
 - [Demo logins](#demo-logins)
 - [Running the tests](#running-the-tests)
@@ -159,6 +162,93 @@ flowchart LR
     EF --> Oracle[("Oracle 23ai")]
     Services --> Files[("Document files<br/>outside wwwroot")]
 ```
+
+## Try it out
+
+A short guide for anyone who wants to run FleetTrack and give feedback. Everything runs on your own computer, and all data is fictional, so you can't break anything.
+
+### 1. Install three things (once)
+
+| What | Why | Download |
+|---|---|---|
+| .NET 10 SDK | Runs the app | [dotnet.microsoft.com](https://dotnet.microsoft.com/download/dotnet/10.0) |
+| Docker Desktop | Runs the Oracle database and a test inbox | [docker.com](https://www.docker.com/products/docker-desktop/) |
+| Git | Downloads the code | [git-scm.com](https://git-scm.com/downloads) |
+
+Open **Docker Desktop** after installing it and leave it running.
+
+### 2. Run five commands
+
+In a terminal (Mac: Terminal; Windows: PowerShell):
+
+```bash
+git clone https://github.com/Moses2906/fleettrack.git
+cd fleettrack
+cp .env.example .env        # Windows: copy .env.example .env
+```
+
+Open the new `.env` file in any text editor and replace both `change-me-...` values with passwords you make up (letters and numbers). Then:
+
+```bash
+docker compose up -d
+```
+
+Wait until `docker ps` shows `fleettrack-oracle` as **(healthy)**. That takes 1–2 minutes the first time. Then, using the `ORACLE_APP_PASSWORD` from `.env`:
+
+```bash
+dotnet user-secrets set "ConnectionStrings:DefaultConnection" "User Id=fleettrack;Password=YOUR_APP_PASSWORD;Data Source=localhost:1521/FREEPDB1" --project src/FleetTrack.Web
+dotnet dev-certs https --trust
+dotnet run --project src/FleetTrack.Web --launch-profile https
+```
+
+When the terminal shows `Now listening on: https://localhost:7282`, open **https://localhost:7282**. The first start creates the database and loads 20 demo vehicles by itself.
+
+### 3. Sign in
+
+| Try it as | Email | Password |
+|---|---|---|
+| **Admin** (can do everything) | `admin@fleettrack.local` | `Admin#Demo2026` |
+| **Staff** (view, log services, no deleting) | `staff@fleettrack.local` | `Staff#Demo2026` |
+
+Tip: sign in as Admin in one browser and as Staff in a private window, to compare.
+
+### 4. Things to try
+
+- [ ] **Dashboard.** Click the numbers and the "Needs attention" tabs.
+- [ ] **Vehicles.** Click a row to expand it. Search `ca482913` (no spaces). Try the **Expiring in** month filter.
+- [ ] **Renew a disk.** Renewals → **Renew** on `NU 77821`, tick *Disk handed to driver*, save. It turns valid and leaves the list.
+- [ ] **Mark a service as done.** Services → **Mark as done** on `BC 34 FG GP`, attach any PDF or photo as the invoice, keep "Same date next year".
+- [ ] **Documents.** Open a vehicle → Documents tab → upload a PDF or photo, then view it. Try renaming a `.txt` file to `.pdf` and uploading it; it should be rejected.
+- [ ] **History.** Search a vehicle, then switch to **By month** and press **Export PDF**.
+- [ ] **Reminder emails.** Administration → Reminder emails → **Send test email to me**, then open the test inbox at **http://localhost:8025**.
+- [ ] **Staff limits.** As Staff, look for Edit/Delete buttons (there shouldn't be any).
+- [ ] **Audit log.** Administration → Audit log shows everything you just did.
+- [ ] **Dark mode** (moon icon) and a **phone-sized window**.
+
+### 5. Send feedback
+
+Please open an issue on GitHub: **[Issues → New issue](https://github.com/Moses2906/fleettrack/issues/new)**. One issue per bug or idea, with what you did, what you expected, and a screenshot if you can.
+
+### Stopping, restarting and starting fresh
+
+| To… | Do this |
+|---|---|
+| Stop the app | Press `Ctrl + C` in its terminal |
+| Start it again later | Open Docker Desktop, then `dotnet run --project src/FleetTrack.Web --launch-profile https` |
+| Stop the database | `docker compose stop` |
+| Reset everything to the original demo data | `docker compose down -v`, delete the folder `src/FleetTrack.Web/App_Data`, then `docker compose up -d` and run the app again |
+
+### If something goes wrong
+
+| Problem | Fix |
+|---|---|
+| Browser warns "connection not private" | Run `dotnet dev-certs https --trust` once, then restart the browser |
+| `Connection string 'DefaultConnection' not found` | Step 2's `dotnet user-secrets set ...` command hasn't been run in the `fleettrack` folder |
+| `ORA-01017` or "invalid username/password" | The password in the user-secrets command must match `ORACLE_APP_PASSWORD` in `.env` |
+| `ORA-12541` or "cannot connect" | The database isn't ready: open Docker Desktop and wait for `docker ps` to show **(healthy)** |
+| "Address already in use" / port 7282 or 1521 busy | Another app (or a second copy of FleetTrack) is using that port; close it and try again |
+| `Too many sign-in attempts` | The sign-in rate limit kicked in; wait one minute |
+| Account locked after wrong passwords | Wait 15 minutes, or reset the demo data as above |
 
 ## Getting started
 
