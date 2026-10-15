@@ -55,9 +55,51 @@
             </MudItem>
         </MudGrid>
     </div>
-    <MudTable Items="vehicles" Filter="Matches" Loading="vehicles is null" Hover="true" Breakpoint="Breakpoint.Md"
+    @* Phones get compact cards; tablets and computers get the full table. *@
+    <div class="ft-mobile-only">
+        @if (vehicles is null)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+        }
+        else if (!Filtered.Any())
+        {
+            <EmptyState Icon="@Icons.Material.Rounded.SearchOff" Title="No vehicles match" Message="Try a different search, or clear the filters.">
+                <MudButton Variant="Variant.Outlined" OnClick="ClearFilters">Clear filters</MudButton>
+            </EmptyState>
+        }
+        else
+        {
+            @foreach (var v in Filtered.Take(mobileLimit))
+            {
+                <a class="ft-vehicle-card" href="@($"vehicles/{v.Id}")">
+                    <div class="d-flex align-center justify-space-between gap-2">
+                        <span class="ft-reg">@v.RegistrationNumber</span>
+                        <LicenceStatusChip ExpiryDate="v.LicenceExpiryDate" Today="today" />
+                    </div>
+                    <MudText Typo="Typo.body2">@v.MakeAndModel</MudText>
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                        Disk @v.LicenceExpiryDate.ToString("dd MMM yyyy") · @(v.Driver ?? "No driver")
+                    </MudText>
+                    @if (!v.HasAllDocuments)
+                    {
+                        <div class="mt-1">
+                            <DocumentChecklist HasRc1="v.HasRc1" HasBrnc="v.HasBrnc" HasProxyLetter="v.HasProxyLetter" HasProxyId="v.HasProxyId" />
+                        </div>
+                    }
+                </a>
+            }
+            @if (Filtered.Count() > mobileLimit)
+            {
+                <div class="pa-3 d-flex justify-center">
+                    <MudButton Variant="Variant.Outlined" OnClick="() => mobileLimit += 30">Show more</MudButton>
+                </div>
+            }
+        }
+    </div>
+
+    <MudTable Class="ft-clickable-rows ft-desktop-only" Items="vehicles" Filter="Matches" Loading="vehicles is null" Hover="true" Breakpoint="Breakpoint.Md"
               Elevation="0" RowsPerPage="50" OnRowClick="@((TableRowClickEventArgs<VehicleRow> e) => Open(e.Item!))"
-              Class="ft-clickable-rows" LoadingProgressColor="Color.Primary" T="VehicleRow">
+              LoadingProgressColor="Color.Primary" T="VehicleRow">
         <HeaderContent>
             <MudTh><MudTableSortLabel InitialDirection="SortDirection.Ascending" SortBy="(VehicleRow v) => v.RegistrationNumber">Registration</MudTableSortLabel></MudTh>
             <MudTh><MudTableSortLabel SortBy="(VehicleRow v) => v.MakeAndModel">Make & model</MudTableSortLabel></MudTh>
@@ -136,6 +178,9 @@
     private int? categoryId;
     private int? driverId;
     private bool missingDocsOnly;
+    private int mobileLimit = 30;
+
+    private IEnumerable<VehicleRow> Filtered => (vehicles ?? []).Where(Matches);
 
     private string Subtitle => vehicles is null ? "Loading…" : $"{vehicles.Count} vehicles. Click a vehicle to see its details.";
 

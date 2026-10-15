@@ -11,7 +11,9 @@ using FleetTrack.Web.Services;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.DataProtection;
 using MudBlazor.Services;
+using System.Threading.RateLimiting;
 using Oracle.EntityFrameworkCore.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -132,6 +134,29 @@ builder.Services.AddSingleton<IDocumentStorage>(new LocalDocumentStorage(
     Path.Combine(builder.Environment.ContentRootPath, storageOptions.DocumentsPath)));
 builder.Services.AddScoped<DocumentService>();
 
+// Sign-in cookies are encrypted with keys ASP.NET Core creates itself. On a server those keys must be kept
+// in a fixed folder (DataProtection__KeysPath), or everyone is signed out whenever the app restarts.
+var keysPath = builder.Configuration["DataProtection:KeysPath"];
+var dataProtection = builder.Services.AddDataProtection().SetApplicationName("FleetTrack");
+if (!string.IsNullOrWhiteSpace(keysPath))
+    dataProtection.PersistKeysToFileSystem(new DirectoryInfo(keysPath));
+
+// Account lockout stops guessing one account's password. This limit stops one computer trying a common
+// password against every account: at most 10 sign-in attempts per minute from each IP address.
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    // A short message (rather than an empty response, which would be turned into a redirect) explains the wait.
+    options.OnRejected = (context, cancellationToken) => new ValueTask(context.HttpContext.Response.WriteAsync(
+        "Too many sign-in attempts from this network. Please wait a minute and try again.", cancellationToken));
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+        HttpMethods.IsPost(context.Request.Method) && context.Request.Path.StartsWithSegments("/Account/Login")
+            ? RateLimitPartition.GetFixedWindowLimiter(
+                context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1) })
+            : RateLimitPartition.GetNoLimiter("everything-else"));
+});
+
 builder.Services.AddHsts(options =>
 {
     options.MaxAge = TimeSpan.FromDays(365);
@@ -185,6 +210,7 @@ app.UseHttpsRedirection();
 app.UseSecurityHeaders();
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery(); // CSRF protection for every form post

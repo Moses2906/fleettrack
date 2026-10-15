@@ -27,9 +27,12 @@ public class AuditService(
     CurrentUserService currentUser,
     PermissionService permissions)
 {
-    public async Task LogAsync(AuditAction action, string entityType, string? entityId, string? details = null)
+    public async Task LogAsync(AuditAction action, string entityType, string? entityId, string? details = null) =>
+        await LogAsAsync(await currentUser.GetActorAsync(), action, entityType, entityId, details);
+
+    /// <summary>Logs on behalf of a specific person, e.g. during sign-in, before they count as signed in.</summary>
+    public async Task LogAsAsync(AuditActor actor, AuditAction action, string entityType, string? entityId, string? details = null)
     {
-        var actor = await currentUser.GetActorAsync();
         await using var db = await dbFactory.CreateDbContextAsync();
         db.AuditLogs.Add(new AuditLog
         {

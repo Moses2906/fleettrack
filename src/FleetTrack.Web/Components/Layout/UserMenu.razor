@@ -1,9 +1,11 @@
 <AuthorizeView Context="auth">
-    <MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" Dense="true" aria-label="Account menu">
-        <ActivatorContent>
-            <MudAvatar Size="Size.Small" Color="Color.Primary" Class="ml-2" Style="cursor: pointer">
-                @Initial(auth.User.DisplayName())
-            </MudAvatar>
+    <MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" Dense="true">
+        <ActivatorContent Context="menu">
+            @* MudBlazor 9 doesn't open the menu by itself for custom content: the button must call ToggleAsync.
+               Being a real button, it can also be reached with Tab and opened with Enter. *@
+            <MudIconButton OnClick="menu.ToggleAsync" aria-label="Account menu" Class="ml-1 pa-1">
+                <MudAvatar Size="Size.Small" Color="Color.Primary">@Initial(auth.User.DisplayName())</MudAvatar>
+            </MudIconButton>
         </ActivatorContent>
         <ChildContent>
             <div class="px-4 py-2">

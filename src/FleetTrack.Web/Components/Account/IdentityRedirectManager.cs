@@ -20,11 +20,15 @@ internal sealed class IdentityRedirectManager(NavigationManager navigationManage
     {
         uri ??= "";
 
-        // Prevent open redirects.
+        // Prevent open redirects: a sign-in link must not be able to send people to another website
+        // afterwards. Addresses inside FleetTrack are kept; anything else goes to the dashboard.
         if (!Uri.IsWellFormedUriString(uri, UriKind.Relative)
-            || uri.StartsWith("//", StringComparison.Ordinal))
+            || uri.StartsWith("//", StringComparison.Ordinal)
+            || uri.StartsWith("/\\", StringComparison.Ordinal))
         {
-            uri = navigationManager.ToBaseRelativePath(uri);
+            uri = uri.StartsWith(navigationManager.BaseUri, StringComparison.OrdinalIgnoreCase)
+                ? navigationManager.ToBaseRelativePath(uri)
+                : "";
         }
 
         navigationManager.NavigateTo(uri);

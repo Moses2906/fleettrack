@@ -16,10 +16,16 @@ internal static class IdentityComponentsEndpointRouteBuilderExtensions
         var accountGroup = endpoints.MapGroup("/Account");
 
         accountGroup.MapPost("/Logout", async (
-            [FromServices] SignInManager<ApplicationUser> signInManager) =>
+            HttpContext context,
+            [FromServices] SignInManager<ApplicationUser> signInManager,
+            [FromServices] IAntiforgery antiforgery) =>
         {
+            // Without this check another website could sign people out (a CSRF attack).
+            if (!await antiforgery.IsRequestValidAsync(context))
+                return Results.BadRequest();
+
             await signInManager.SignOutAsync();
-            return TypedResults.LocalRedirect("~/Account/Login");
+            return Results.LocalRedirect("~/Account/Login");
         });
 
         accountGroup.MapPost("/PasskeyCreationOptions", async (

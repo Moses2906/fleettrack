@@ -1,4 +1,5 @@
 @inherits LayoutComponentBase
+@inject IJSRuntime JS
 
 <MudThemeProvider @ref="themeProvider" Theme="FleetTrackTheme.Theme" @bind-IsDarkMode="isDarkMode" />
 <MudPopoverProvider />
@@ -13,7 +14,7 @@
         <MudSpacer />
         <MudTooltip Text="@(isDarkMode ? "Light mode" : "Dark mode")">
             <MudIconButton Icon="@(isDarkMode ? Icons.Material.Rounded.LightMode : Icons.Material.Rounded.DarkMode)"
-                           Color="Color.Inherit" OnClick="() => isDarkMode = !isDarkMode" aria-label="Toggle dark mode" />
+                           Color="Color.Inherit" OnClick="ToggleDarkModeAsync" aria-label="Toggle dark mode" />
         </MudTooltip>
         <UserMenu />
     </MudAppBar>
@@ -54,9 +55,16 @@
     {
         if (firstRender && themeProvider is not null)
         {
-            // Start in whatever mode the phone or computer is set to.
-            isDarkMode = await themeProvider.GetSystemDarkModeAsync();
+            // Use the choice saved in this browser; otherwise follow the phone or computer's setting.
+            var saved = await JS.InvokeAsync<string?>("fleetTrackTheme.get");
+            isDarkMode = saved is null ? await themeProvider.GetSystemDarkModeAsync() : saved == "dark";
             StateHasChanged();
         }
+    }
+
+    private async Task ToggleDarkModeAsync()
+    {
+        isDarkMode = !isDarkMode;
+        await JS.InvokeVoidAsync("fleetTrackTheme.set", isDarkMode ? "dark" : "light");
     }
 }

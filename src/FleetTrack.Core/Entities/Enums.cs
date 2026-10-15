@@ -43,5 +43,7 @@ public enum AuditAction
     Delete,
     View,
     Download,
-    Export
+    Export,
+    SignIn,
+    SignInFailed
 }
