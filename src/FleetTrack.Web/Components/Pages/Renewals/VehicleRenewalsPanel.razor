@@ -3,7 +3,7 @@
 @inject IDialogService Dialogs
 @inject ISnackbar Snackbar
 
-<div class="d-flex flex-wrap align-center justify-space-between gap-2 pa-2">
+<div class="d-flex flex-wrap align-center justify-space-between gap-2 px-5 py-3">
     <MudText Typo="Typo.body2" Class="mud-text-secondary">
         @if (renewals is { Count: > 0 })
         {
@@ -12,7 +12,7 @@
     </MudText>
     @if (canEdit)
     {
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.Autorenew" Size="Size.Small" OnClick="RenewAsync">Record renewal</MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.Autorenew" Size="Size.Small" OnClick="RenewAsync">Record renewal</MudButton>
     }
 </div>
 
@@ -26,12 +26,10 @@ else if (renewals.Count == 0)
 }
 else
 {
-    <MudStack Spacing="3" Class="pa-2">
-        @foreach (var renewal in renewals)
-        {
-            <RenewalCard Renewal="renewal" CanEdit="canEdit" CanDelete="canDelete" OnChanged="ChangedAsync" />
-        }
-    </MudStack>
+    @foreach (var renewal in renewals)
+    {
+        <RenewalCard Renewal="renewal" CanEdit="canEdit" CanDelete="canDelete" OnChanged="ChangedAsync" />
+    }
 }
 
 @code {

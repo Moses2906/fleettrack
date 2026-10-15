@@ -16,8 +16,8 @@
     </Actions>
 </PageHeader>
 
-<MudPaper Outlined="true" Elevation="0">
-    <div class="px-4 pt-4 pb-1">
+<SectionCard Flush="true">
+    <div class="px-5 pt-4 pb-1">
         <MudGrid Spacing="2">
             <MudItem xs="12" md="4">
                 <MudTextField @bind-Value="search" Immediate="true" Clearable="true" Variant="Variant.Outlined" Margin="Margin.Dense"
@@ -38,7 +38,14 @@
                 <MudDatePicker Date="@(expiringMonth?.FirstDay.ToDateTime(TimeOnly.MinValue))" DateChanged="MonthPicked" OpenTo="OpenTo.Month" FixDay="1"
                                DateFormat="MMMM yyyy" Label="Expiring in" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" />
             </MudItem>
-            <MudItem xs="6" sm="4" md="2">
+            <MudItem xs="12" sm="4" md="2" Class="d-flex align-center">
+                <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Rounded.Tune" OnClick="() => showMoreFilters = !showMoreFilters">
+                    @(showMoreFilters ? "Fewer filters" : MoreFiltersLabel)
+                </MudButton>
+            </MudItem>
+            @if (showMoreFilters)
+            {
+            <MudItem xs="6" sm="4" md="3">
                 <MudSelect T="int?" @bind-Value="categoryId" Label="Category" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
                     @foreach (var c in categories)
                     {
@@ -46,7 +53,7 @@
                     }
                 </MudSelect>
             </MudItem>
-            <MudItem xs="6" sm="4" md="2">
+            <MudItem xs="6" sm="4" md="3">
                 <MudSelect T="int?" @bind-Value="driverId" Label="Driver" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
                     <MudSelectItem T="int?" Value="NoDriver">No driver assigned</MudSelectItem>
                     @foreach (var d in drivers)
@@ -55,8 +62,11 @@
                     }
                 </MudSelect>
             </MudItem>
-            <MudItem xs="12" Class="d-flex align-center justify-space-between flex-wrap gap-2 pt-0">
-                <MudSwitch @bind-Value="missingDocsOnly" Color="Color.Error" Label="Only vehicles with missing documents" />
+            <MudItem xs="12" sm="4" md="3" Class="d-flex align-center">
+                <MudSwitch @bind-Value="missingDocsOnly" Color="Color.Error" Label="Missing documents only" />
+            </MudItem>
+            }
+            <MudItem xs="12" Class="d-flex align-center justify-end flex-wrap gap-2 pt-0">
                 @if (expiringMonth is { } m)
                 {
                     <MudText Typo="Typo.body2" Class="mud-text-secondary">
@@ -85,7 +95,7 @@
                     <button type="button" class="ft-vehicle-card-head" @onclick="() => Toggle(expandedOnPhone, v.Id)" aria-expanded="@(expandedOnPhone.Contains(v.Id) ? "true" : "false")">
                         <div class="d-flex align-center justify-space-between gap-2">
                             <span class="ft-reg">@v.RegistrationNumber</span>
-                            <LicenceStatusChip ExpiryDate="v.LicenceExpiryDate" Today="today" />
+                            <LicenceStatusChip ExpiryDate="v.LicenceExpiryDate" Today="today" HideWhenValid="true" />
                         </div>
                         <MudText Typo="Typo.body2">@v.MakeAndModel</MudText>
                         <MudText Typo="Typo.caption" Class="mud-text-secondary">Disk @v.LicenceExpiryDate.ToString("dd MMM yyyy") · @(v.Driver ?? "No driver")</MudText>
@@ -125,7 +135,7 @@
             <MudTd>
                 <div class="d-flex align-center gap-2">
                     <span style="min-width: 88px">@context.LicenceExpiryDate.ToString("dd MMM yyyy")</span>
-                    <LicenceStatusChip ExpiryDate="context.LicenceExpiryDate" Today="today" />
+                    <LicenceStatusChip ExpiryDate="context.LicenceExpiryDate" Today="today" HideWhenValid="true" />
                 </div>
             </MudTd>
             <MudTd>
@@ -141,7 +151,9 @@
             <MudTd>
                 @if (context.HasAllDocuments)
                 {
-                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Success" Icon="@Icons.Material.Rounded.CheckCircle" Class="ma-0">All 4</MudChip>
+                    <MudTooltip Text="All 4 documents on file">
+                        <MudIcon Icon="@Icons.Material.Rounded.Check" Size="Size.Small" Class="mud-text-secondary" aria-label="All documents on file" />
+                    </MudTooltip>
                 }
                 else
                 {
@@ -178,7 +190,7 @@
             <MudTablePager PageSizeOptions="[25, 50, 100]" />
         </PagerContent>
     </MudTable>
-</MudPaper>
+</SectionCard>
 
 @code {
     private enum StatusFilter { All, Attention, Expired, DueSoon, Valid }
@@ -205,6 +217,17 @@
     private int? driverId;
     private bool missingDocsOnly;
     private int mobileLimit = 30;
+    private bool showMoreFilters;
+
+    // Shows how many of the tucked-away filters are on, e.g. "More filters (2)".
+    private string MoreFiltersLabel
+    {
+        get
+        {
+            var active = (categoryId is null ? 0 : 1) + (driverId is null ? 0 : 1) + (missingDocsOnly ? 1 : 0);
+            return active == 0 ? "More filters" : $"More filters ({active})";
+        }
+    }
 
     private IEnumerable<VehicleRow> Filtered => (vehicles ?? []).Where(Matches);
 
@@ -222,6 +245,7 @@
             _ => StatusFilter.All,
         };
         missingDocsOnly = MissingQuery == true;
+        showMoreFilters = missingDocsOnly;
         expiringMonth = YearMonth.TryParse(MonthQuery, out var month) ? month : null;
 
         categories = await ReferenceData.CategoryOptionsAsync();

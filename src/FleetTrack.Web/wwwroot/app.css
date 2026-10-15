@@ -296,9 +296,15 @@ h1:focus {
 
 /* "Disks due by month" strip on the Renewals page */
 .ft-month-strip {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+    display: flex;
     gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: thin;
+}
+
+.ft-month-strip .ft-month {
+    flex: 0 0 84px;
 }
 
 .ft-month {
@@ -345,4 +351,114 @@ h1:focus {
 .ft-section-title {
     font-weight: 600;
     margin-bottom: 8px;
+}
+
+/* ---------- Shared building blocks (keep every page consistent) ---------- */
+
+.ft-card {
+    overflow: hidden;
+}
+
+.ft-card-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 16px;
+    padding: 16px 20px 0;
+}
+
+.ft-card-title {
+    font-size: 1.05rem !important;
+    font-weight: 600 !important;
+}
+
+.ft-card-body {
+    padding: 12px 20px 20px;
+}
+
+.ft-list-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 20px;
+    border-top: 1px solid var(--mud-palette-lines-default);
+}
+
+.ft-list-row-link {
+    cursor: pointer;
+}
+
+.ft-list-row-link:hover {
+    background: var(--mud-palette-action-default-hover);
+}
+
+.ft-list-row-main {
+    min-width: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 2px 12px;
+}
+
+.ft-list-row-side {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.ft-muted {
+    color: var(--mud-palette-text-secondary);
+    font-size: 0.875rem;
+}
+
+@media (max-width: 599.98px) {
+    .ft-list-row {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
+
+/* Key facts on the vehicle page: label above value, in up to four columns */
+.ft-facts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px 24px;
+}
+
+.ft-fact-label {
+    font-size: 0.75rem;
+    color: var(--mud-palette-text-secondary);
+    margin-bottom: 2px;
+}
+
+.ft-fact-value {
+    font-weight: 500;
+}
+
+/* Documents table on the vehicle page */
+.ft-doc-table td, .ft-doc-table th {
+    vertical-align: middle;
+}
+
+.ft-attention-tabs .mud-tabs-panels > div > :first-child.ft-list-row,
+.ft-doc-table thead th {
+    border-top: none;
+}
+
+.ft-renewal {
+    padding: 14px 20px;
+    border-top: 1px solid var(--mud-palette-lines-default);
+}
+
+/* One option per line, e.g. the "Next service" choices */
+.ft-radio-stack,
+.ft-radio-stack > .mud-radio-group,
+.ft-radio-stack .mud-radio-group {
+    /* !important: MudBlazor's own (more specific) rule lays radio groups out in a row. */
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
 }

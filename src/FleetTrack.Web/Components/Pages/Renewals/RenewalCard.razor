@@ -1,18 +1,18 @@
-@* One renewal: the disk details and a short timeline of what happened afterwards. *@
+@* One renewal as a calm row: the disk on one line, the follow-up steps as small tags underneath. *@
 @inject RenewalService Renewals
 @inject IDialogService Dialogs
 @inject ISnackbar Snackbar
 
-<MudPaper Outlined="true" Elevation="0" Class="pa-4">
+<div class="ft-renewal">
     <div class="d-flex flex-wrap align-start justify-space-between gap-2">
         <div>
-            @if (ShowVehicle)
-            {
-                <MudLink Href="@($"vehicles/{Renewal.VehicleId}?tab=renewals")" Class="ft-reg" Underline="Underline.Hover">@Renewal.RegistrationNumber</MudLink>
-            }
-            <MudText Typo="Typo.subtitle1">
-                <b>Valid until @Renewal.NewExpiryDate.ToString("dd MMM yyyy")</b>
-            </MudText>
+            <div class="d-flex flex-wrap align-baseline gap-x-3">
+                @if (ShowVehicle)
+                {
+                    <MudLink Href="@($"vehicles/{Renewal.VehicleId}?tab=renewals")" Class="ft-reg" Underline="Underline.Hover">@Renewal.RegistrationNumber</MudLink>
+                }
+                <span class="ft-fact-value">Valid until @Renewal.NewExpiryDate.ToString("dd MMM yyyy")</span>
+            </div>
             <MudText Typo="Typo.body2" Class="mud-text-secondary">
                 Bought @Renewal.DatePurchased.ToString("dd MMM yyyy") · @DisplayNames.Money(Renewal.AmountPaid)
                 @if (Renewal.ReferenceNumber is not null)
@@ -47,19 +47,13 @@
     }
 
     @* One row of small tags: done steps in green with their date, outstanding ones as "mark done" buttons. *@
-    <div class="d-flex flex-wrap gap-1 mt-3">
+    <div class="d-flex flex-wrap gap-1 mt-2">
         @foreach (var step in Renewal.Steps)
         {
             <MudTooltip Text="@(step.Notes ?? $"Recorded by {step.RecordedBy}")">
-                @if (CanDelete)
-                {
-                    <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Text" Icon="@Icons.Material.Rounded.CheckCircle" Class="ma-0"
-                             OnClose="() => DeleteStepAsync(step)">@DisplayNames.Of(step.StepType) · @step.StepDate.ToString("dd MMM")</MudChip>
-                }
-                else
-                {
-                    <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Text" Icon="@Icons.Material.Rounded.CheckCircle" Class="ma-0">@DisplayNames.Of(step.StepType) · @step.StepDate.ToString("dd MMM")</MudChip>
-                }
+                @* Admins can click a done step to remove it (with a confirmation), so there's no ✕ on every tag. *@
+                <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Text" Icon="@Icons.Material.Rounded.CheckCircle" Class="ma-0"
+                         OnClick="@(() => CanDelete ? DeleteStepAsync(step) : Task.CompletedTask)">@DisplayNames.Short(step.StepType) · @step.StepDate.ToString("dd MMM")</MudChip>
             </MudTooltip>
         }
         @foreach (var outstanding in Renewal.OutstandingSteps)
@@ -67,15 +61,15 @@
             @if (CanEdit)
             {
                 <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Icon="@Icons.Material.Rounded.Add" Class="ma-0"
-                         OnClick="() => AddStepAsync(outstanding)">@DisplayNames.Of(outstanding)</MudChip>
+                         OnClick="() => AddStepAsync(outstanding)">@DisplayNames.Short(outstanding)</MudChip>
             }
             else
             {
-                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Icon="@Icons.Material.Rounded.RadioButtonUnchecked" Class="ma-0 mud-text-secondary">@DisplayNames.Of(outstanding)</MudChip>
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Icon="@Icons.Material.Rounded.RadioButtonUnchecked" Class="ma-0 mud-text-secondary">@DisplayNames.Short(outstanding)</MudChip>
             }
         }
     </div>
-</MudPaper>
+</div>
 
 @code {
     [Parameter, EditorRequired] public RenewalRow Renewal { get; set; } = default!;
@@ -121,6 +115,10 @@
 
     private async Task DeleteStepAsync(RenewalStepRow step)
     {
+        var confirmed = await Dialogs.ShowMessageBoxAsync("Remove step",
+            $"Remove \"{DisplayNames.Of(step.StepType)}\" ({step.StepDate:dd MMM yyyy}) from this renewal?", yesText: "Remove", cancelText: "Cancel");
+        if (confirmed != true)
+            return;
         await Renewals.DeleteStepAsync(step.Id);
         await OnChanged.InvokeAsync();
     }

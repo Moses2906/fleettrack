@@ -42,15 +42,16 @@
     }
     else
     {
-        <div class="d-flex flex-wrap align-center gap-2">
+        <div class="d-flex flex-wrap align-center justify-space-between gap-2">
+            <div class="d-flex align-center gap-1">
             <MudIconButton Icon="@Icons.Material.Rounded.ChevronLeft" OnClick="() => ShowMonth(month.AddMonths(-1))" aria-label="Previous month" />
             @* A month picker: opens on the month view and always uses the 1st of the month. *@
             <MudDatePicker Date="month.FirstDay.ToDateTime(TimeOnly.MinValue)" DateChanged="MonthPicked" OpenTo="OpenTo.Month" FixDay="1"
-                           DateFormat="MMMM yyyy" Variant="Variant.Outlined" Margin="Margin.Dense" Label="Month" Style="max-width: 220px"
+                           DateFormat="MMMM yyyy" Variant="Variant.Outlined" Margin="Margin.Dense" Label="Month" Style="width: 200px"
                            MaxDate="DateTime.Today" />
             <MudIconButton Icon="@Icons.Material.Rounded.ChevronRight" OnClick="() => ShowMonth(month.AddMonths(1))" aria-label="Next month"
                            Disabled="@(month.AddMonths(1).FirstDay > Vehicles.Today)" />
-            <MudSpacer />
+            </div>
             <MudButton Href="@($"history/month/{month}/pdf")" Target="_blank" Variant="Variant.Filled" Color="Color.Primary"
                        StartIcon="@Icons.Material.Rounded.PictureAsPdf">Export PDF</MudButton>
         </div>

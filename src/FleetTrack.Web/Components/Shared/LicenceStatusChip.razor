@@ -1,10 +1,15 @@
-@* Colour-coded licence disk status. Colour is never the only signal: there's always an icon and text too. *@
+@* Colour-coded licence disk status. Colour is never the only signal: there's always an icon and text too.
+   In long lists HideWhenValid keeps valid disks quiet, so only the problems stand out. *@
+@if (!(HideWhenValid && Status == LicenceStatus.Valid))
+{
 <MudChip T="string" Size="@Size" Variant="Variant.Text" Color="@Colour" Icon="@StatusIcon" Class="ma-0">@Label</MudChip>
+}
 
 @code {
     [Parameter, EditorRequired] public DateOnly ExpiryDate { get; set; }
     [Parameter, EditorRequired] public DateOnly Today { get; set; }
     [Parameter] public Size Size { get; set; } = Size.Small;
+    [Parameter] public bool HideWhenValid { get; set; }
 
     private LicenceStatus Status => LicenceStatusRules.GetStatus(ExpiryDate, Today);
     private int Days => ExpiryDate.DayNumber - Today.DayNumber;

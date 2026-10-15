@@ -12,11 +12,8 @@
 
 @if (outlook is not null)
 {
-    <MudPaper Outlined="true" Elevation="0" Class="pa-4 mb-4">
-        <div class="d-flex flex-wrap align-center justify-space-between gap-2 mb-3">
-            <MudText Typo="Typo.h6">Disks due by month</MudText>
-            <MudText Typo="Typo.caption" Class="mud-text-secondary">Click a month to see which vehicles</MudText>
-        </div>
+    <SectionCard Title="Disks due by month" Class="mb-4">
+        @* One scrolling row of months; click one to see which vehicles. *@
         <div class="ft-month-strip">
             @if (outlook.AlreadyExpired > 0)
             {
@@ -34,13 +31,12 @@
                 </a>
             }
         </div>
-    </MudPaper>
+    </SectionCard>
 }
 
 <MudGrid Spacing="4">
     <MudItem xs="12" lg="5">
-        <MudPaper Outlined="true" Elevation="0">
-            <MudText Typo="Typo.h6" Class="pa-4 pb-2">To renew</MudText>
+        <SectionCard Title="To renew" Flush="true">
             @if (toRenew is null)
             {
                 <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
@@ -51,57 +47,51 @@
             }
             else
             {
-                <MudList T="VehicleRow" Class="pt-0">
-                    @foreach (var v in toRenew)
-                    {
-                        <MudListItem T="VehicleRow">
-                            <div class="d-flex flex-wrap align-center justify-space-between gap-2">
-                                <div>
-                                    <MudLink Href="@($"vehicles/{v.Id}?tab=renewals")" Class="ft-reg" Underline="Underline.Hover">@v.RegistrationNumber</MudLink>
-                                    <MudText Typo="Typo.body2" Class="mud-text-secondary">@v.MakeAndModel · expires @v.LicenceExpiryDate.ToString("dd MMM yyyy")</MudText>
-                                </div>
-                                <div class="d-flex align-center gap-2">
-                                    <LicenceStatusChip ExpiryDate="v.LicenceExpiryDate" Today="today" />
-                                    @if (canEdit)
-                                    {
-                                        <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" OnClick="() => RenewAsync(v)">Renew</MudButton>
-                                    }
-                                </div>
-                            </div>
-                        </MudListItem>
-                    }
-                </MudList>
+                @foreach (var v in toRenew)
+                {
+                    <ListRow>
+                        <Main>
+                            <MudLink Href="@($"vehicles/{v.Id}?tab=renewals")" Class="ft-reg" Underline="Underline.Hover">@v.RegistrationNumber</MudLink>
+                            <span class="ft-muted">@v.MakeAndModel</span>
+                        </Main>
+                        <Side>
+                            <LicenceStatusChip ExpiryDate="v.LicenceExpiryDate" Today="today" />
+                            @if (canEdit)
+                            {
+                                <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" OnClick="() => RenewAsync(v)">Renew</MudButton>
+                            }
+                        </Side>
+                    </ListRow>
+                }
             }
-        </MudPaper>
+        </SectionCard>
     </MudItem>
 
     <MudItem xs="12" lg="7">
-        <MudPaper Outlined="true" Elevation="0" Class="pa-4">
-            <div class="d-flex flex-wrap align-center justify-space-between gap-2 mb-3">
-                <MudText Typo="Typo.h6">Recent renewals</MudText>
-                <MudSwitch @bind-Value="outstandingOnly" Color="Color.Primary" Label="Only with steps outstanding" />
-            </div>
-            @if (renewals is null)
-            {
-                <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
-            }
-            else if (!VisibleRenewals.Any())
-            {
-                <EmptyState Icon="@Icons.Material.Rounded.TaskAlt" Title="Nothing outstanding" Message="Every recent disk has been handed over, fitted and filed." />
-            }
-            else
-            {
-                <MudStack Spacing="3">
+        <SectionCard Title="Recent renewals" Subtitle="The last 90 days" Flush="true">
+            <Actions>
+                <MudSwitch @bind-Value="outstandingOnly" Color="Color.Primary" Label="Steps outstanding" />
+            </Actions>
+            <ChildContent>
+                @if (renewals is null)
+                {
+                    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+                }
+                else if (!VisibleRenewals.Any())
+                {
+                    <EmptyState Icon="@Icons.Material.Rounded.TaskAlt" Title="Nothing outstanding" Message="Every recent disk has been handed over, fitted and filed." />
+                }
+                else
+                {
                     @foreach (var renewal in VisibleRenewals)
                     {
                         <RenewalCard Renewal="renewal" ShowVehicle="true" CanEdit="canEdit" CanDelete="canDelete" OnChanged="LoadAsync" />
                     }
-                </MudStack>
-            }
-        </MudPaper>
+                }
+            </ChildContent>
+        </SectionCard>
     </MudItem>
 </MudGrid>
-
 @code {
     private List<VehicleRow>? toRenew;
     private ExpiryOutlook? outlook;

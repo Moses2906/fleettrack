@@ -6,7 +6,7 @@
 
 <PageTitle>Services · FleetTrack</PageTitle>
 
-<PageHeader Title="Service & maintenance" Subtitle="Upcoming services and the full log of services and repairs.">
+<PageHeader Title="Services" Subtitle="What's due, and every service and repair so far.">
     <Actions>
         <AuthorizeView Policy="@nameof(Permission.AddServiceRecords)">
             <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.Add" OnClick="() => LogAsync(null)">Log service</MudButton>
@@ -14,48 +14,42 @@
     </Actions>
 </PageHeader>
 
-<MudPaper Outlined="true" Elevation="0" Class="mb-4">
-    <div class="d-flex align-center justify-space-between pa-4 pb-2">
-        <MudText Typo="Typo.h6">Due within 30 days or overdue</MudText>
-        <MudSwitch @bind-Value="showAllReminders" Color="Color.Primary" Label="Show all scheduled" />
-    </div>
-    @if (reminders is null)
-    {
-        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
-    }
-    else if (!VisibleReminders.Any())
-    {
-        <EmptyState Icon="@Icons.Material.Rounded.EventAvailable" Title="No services due" Message="Nothing is overdue or due in the next 30 days." />
-    }
-    else
-    {
-        <MudList T="ServiceReminderRow" Class="pt-0">
+<SectionCard Title="Due soon or overdue" Flush="true" Class="mb-4">
+    <Actions>
+        <MudSwitch @bind-Value="showAllReminders" Color="Color.Primary" Label="Show all booked" />
+    </Actions>
+    <ChildContent>
+        @if (reminders is null)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+        }
+        else if (!VisibleReminders.Any())
+        {
+            <EmptyState Icon="@Icons.Material.Rounded.EventAvailable" Title="No services due" Message="Nothing is overdue or due in the next 30 days." />
+        }
+        else
+        {
             @foreach (var r in VisibleReminders)
             {
-                <MudListItem T="ServiceReminderRow">
-                    <div class="d-flex flex-wrap align-center justify-space-between gap-2">
-                        <div>
-                            <MudLink Href="@($"vehicles/{r.VehicleId}?tab=services")" Class="ft-reg" Underline="Underline.Hover">@r.RegistrationNumber</MudLink>
-                            <MudText Typo="Typo.body2" Class="mud-text-secondary">
-                                @r.MakeAndModel · last serviced @r.LastServiceDate.ToString("dd MMM yyyy") at @r.LastOdometerKm.ToString("#,##0") km
-                            </MudText>
-                        </div>
-                        <div class="d-flex align-center gap-2">
-                            <ServiceReminderChip DueDate="r.NextServiceDue" Today="today" />
-                            <AuthorizeView Policy="@nameof(Permission.AddServiceRecords)">
-                                <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.TaskAlt"
-                                           OnClick="() => MarkDoneAsync(r)">Mark as done</MudButton>
-                            </AuthorizeView>
-                        </div>
-                    </div>
-                </MudListItem>
+                <ListRow>
+                    <Main>
+                        <MudLink Href="@($"vehicles/{r.VehicleId}?tab=services")" Class="ft-reg" Underline="Underline.Hover">@r.RegistrationNumber</MudLink>
+                        <span class="ft-muted">@r.MakeAndModel · last serviced @r.LastServiceDate.ToString("dd MMM yyyy")</span>
+                    </Main>
+                    <Side>
+                        <ServiceReminderChip DueDate="r.NextServiceDue" Today="today" />
+                        <AuthorizeView Policy="@nameof(Permission.AddServiceRecords)">
+                            <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" OnClick="() => MarkDoneAsync(r)">Mark as done</MudButton>
+                        </AuthorizeView>
+                    </Side>
+                </ListRow>
             }
-        </MudList>
-    }
-</MudPaper>
+        }
+    </ChildContent>
+</SectionCard>
 
-<MudPaper Outlined="true" Elevation="0">
-    <div class="px-4 pt-4 pb-1">
+<SectionCard Title="Service log" Flush="true">
+    <div class="px-5 pt-2 pb-1">
         <MudGrid Spacing="2">
             <MudItem xs="12" md="5">
                 <MudTextField @bind-Value="search" Immediate="true" Clearable="true" Variant="Variant.Outlined" Margin="Margin.Dense"
@@ -103,7 +97,7 @@
         <NoRecordsContent><EmptyState Icon="@Icons.Material.Rounded.SearchOff" Title="No services match" /></NoRecordsContent>
         <PagerContent><MudTablePager PageSizeOptions="[25, 50, 100]" /></PagerContent>
     </MudTable>
-</MudPaper>
+</SectionCard>
 
 @code {
     private List<ServiceRow>? services;

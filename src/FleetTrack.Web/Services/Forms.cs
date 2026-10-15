@@ -202,6 +202,15 @@ public static class DisplayNames
         _ => "Other",
     };
 
+    /// <summary>Short labels for small tags: "Handed over", "Fitted", "Filed".</summary>
+    public static string Short(RenewalStepType type) => type switch
+    {
+        RenewalStepType.DiskHandedToDriver => "Handed over",
+        RenewalStepType.DiskFittedToVehicle => "Fitted",
+        RenewalStepType.CopyFiled => "Filed",
+        _ => "Note",
+    };
+
     /// <summary>Rand amounts, e.g. "R 2,400.00". Fixed format so it looks the same on every server.</summary>
     public static string Money(decimal amount) =>
         "R " + amount.ToString("#,##0.00", System.Globalization.CultureInfo.InvariantCulture);

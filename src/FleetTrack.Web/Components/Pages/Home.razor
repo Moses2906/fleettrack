@@ -2,12 +2,11 @@
 @attribute [Authorize(Policy = nameof(Permission.ViewRecords))]
 @inject VehicleService Vehicles
 @inject ServiceLogService ServiceLog
-@inject NavigationManager Navigation
 
 <PageTitle>Dashboard · FleetTrack</PageTitle>
 
 <AuthorizeView Context="auth">
-    <PageHeader Title="@($"Hello, {FirstName(auth.User.DisplayName())}")" Subtitle="@($"Here's your fleet today, {today:dddd d MMMM yyyy}.")" />
+    <PageHeader Title="@($"Hello, {FirstName(auth.User.DisplayName())}")" Subtitle="@($"{today:dddd d MMMM yyyy}")" />
 </AuthorizeView>
 
 @if (summary is null)
@@ -16,7 +15,7 @@
 }
 else
 {
-    <MudGrid Spacing="4" Class="mb-2">
+    <MudGrid Spacing="4" Class="mb-1">
         <MudItem xs="6" md="3">
             <StatCard Href="vehicles" Label="Vehicles" Value="summary.TotalVehicles" Icon="@Icons.Material.Rounded.DirectionsCar" Colour="Color.Primary" />
         </MudItem>
@@ -31,99 +30,57 @@ else
         </MudItem>
     </MudGrid>
 
-    <MudGrid Spacing="4">
-        <MudItem xs="12" lg="7">
-            <MudPaper Outlined="true" Elevation="0" Class="h-100">
-                <div class="d-flex align-center justify-space-between pa-4 pb-2">
-                    <MudText Typo="Typo.h6">Licence disks needing attention</MudText>
-                    <MudButton Href="vehicles?status=attention" Size="Size.Small" EndIcon="@Icons.Material.Rounded.ChevronRight">View all</MudButton>
-                </div>
+    @* One card with tabs, instead of three lists competing for attention. *@
+    <SectionCard Title="Needs attention" Flush="true">
+        <MudTabs Elevation="0" ApplyEffectsToContainer="true" @bind-ActivePanelIndex="tab" Class="ft-attention-tabs">
+            <MudTabPanel Text="@($"Licence disks · {summary.LicenceAttention.Count}")">
                 @if (summary.LicenceAttention.Count == 0)
                 {
-                    <EmptyState Icon="@Icons.Material.Rounded.Verified" Title="All disks are valid"
-                                Message="Nothing expires in the next 30 days." />
+                    <EmptyState Icon="@Icons.Material.Rounded.Verified" Title="All disks are valid" Message="Nothing expires in the next 30 days." />
                 }
-                else
+                @foreach (var v in summary.LicenceAttention)
                 {
-                    <MudList T="VehicleRow" Dense="false" Class="pt-0">
-                        @foreach (var v in summary.LicenceAttention)
-                        {
-                            <MudListItem T="VehicleRow" OnClick="() => Open(v)">
-                                <div class="d-flex align-center justify-space-between gap-3 flex-wrap">
-                                    <div>
-                                        <span class="ft-reg">@v.RegistrationNumber</span>
-                                        <MudText Typo="Typo.body2" Class="mud-text-secondary">@v.MakeAndModel · expires @v.LicenceExpiryDate.ToString("dd MMM yyyy")</MudText>
-                                    </div>
-                                    <LicenceStatusChip ExpiryDate="v.LicenceExpiryDate" Today="today" />
-                                </div>
-                            </MudListItem>
-                        }
-                    </MudList>
+                    <ListRow Href="@($"vehicles/{v.Id}")">
+                        <Main><span class="ft-reg">@v.RegistrationNumber</span> <span class="ft-muted">@v.MakeAndModel</span></Main>
+                        <Side><LicenceStatusChip ExpiryDate="v.LicenceExpiryDate" Today="today" /></Side>
+                    </ListRow>
                 }
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" lg="5">
-            <MudPaper Outlined="true" Elevation="0" Class="h-100">
-                <div class="d-flex align-center justify-space-between pa-4 pb-2">
-                    <MudText Typo="Typo.h6">Missing documents</MudText>
-                    <MudButton Href="vehicles?missing=true" Size="Size.Small" EndIcon="@Icons.Material.Rounded.ChevronRight">View all</MudButton>
-                </div>
+            </MudTabPanel>
+            <MudTabPanel Text="@($"Documents · {summary.DocumentAttention.Count}")">
                 @if (summary.DocumentAttention.Count == 0)
                 {
                     <EmptyState Icon="@Icons.Material.Rounded.FolderSpecial" Title="Every document is on file" />
                 }
-                else
+                @foreach (var v in summary.DocumentAttention)
                 {
-                    <MudList T="VehicleRow" Class="pt-0">
-                        @foreach (var v in summary.DocumentAttention)
-                        {
-                            <MudListItem T="VehicleRow" OnClick="() => Open(v)">
-                                <span class="ft-reg">@v.RegistrationNumber</span>
-                                <div class="mt-1">
-                                    <DocumentChecklist HasRc1="v.HasRc1" HasBrnc="v.HasBrnc" HasProxyLetter="v.HasProxyLetter" HasProxyId="v.HasProxyId" />
-                                </div>
-                            </MudListItem>
-                        }
-                    </MudList>
+                    <ListRow Href="@($"vehicles/{v.Id}?tab=documents")">
+                        <Main><span class="ft-reg">@v.RegistrationNumber</span> <span class="ft-muted">@MissingNames(v)</span></Main>
+                        <Side><MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Error" Class="ma-0">@v.MissingDocumentCount missing</MudChip></Side>
+                    </ListRow>
                 }
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12">
-            <MudPaper Outlined="true" Elevation="0">
-                <div class="d-flex align-center justify-space-between pa-4 pb-2">
-                    <MudText Typo="Typo.h6">Services due</MudText>
-                    <MudButton Href="services" Size="Size.Small" EndIcon="@Icons.Material.Rounded.ChevronRight">View all</MudButton>
-                </div>
+            </MudTabPanel>
+            <MudTabPanel Text="@($"Services · {servicesDue.Count}")">
                 @if (servicesDue.Count == 0)
                 {
                     <EmptyState Icon="@Icons.Material.Rounded.EventAvailable" Title="No services due" Message="Nothing is overdue or due in the next 30 days." />
                 }
-                else
+                @foreach (var r in servicesDue)
                 {
-                    <MudList T="ServiceReminderRow" Class="pt-0">
-                        @foreach (var r in servicesDue)
-                        {
-                            <MudListItem T="ServiceReminderRow" Href="@($"vehicles/{r.VehicleId}?tab=services")">
-                                <div class="d-flex align-center justify-space-between gap-3 flex-wrap">
-                                    <div>
-                                        <span class="ft-reg">@r.RegistrationNumber</span>
-                                        <MudText Typo="Typo.body2" Class="mud-text-secondary">@r.MakeAndModel · last serviced @r.LastServiceDate.ToString("dd MMM yyyy")</MudText>
-                                    </div>
-                                    <ServiceReminderChip DueDate="r.NextServiceDue" Today="today" />
-                                </div>
-                            </MudListItem>
-                        }
-                    </MudList>
+                    <ListRow Href="@($"vehicles/{r.VehicleId}?tab=services")">
+                        <Main><span class="ft-reg">@r.RegistrationNumber</span> <span class="ft-muted">@r.MakeAndModel</span></Main>
+                        <Side><ServiceReminderChip DueDate="r.NextServiceDue" Today="today" /></Side>
+                    </ListRow>
                 }
-            </MudPaper>
-        </MudItem>
-    </MudGrid>
+            </MudTabPanel>
+        </MudTabs>
+    </SectionCard>
 }
 
 @code {
     private DashboardSummary? summary;
     private List<ServiceReminderRow> servicesDue = [];
     private DateOnly today;
+    private int tab;
 
     protected override async Task OnInitializedAsync()
     {
@@ -131,11 +88,11 @@ else
         summary = await Vehicles.GetDashboardAsync();
         servicesDue = (await ServiceLog.RemindersAsync())
             .Where(r => r.ReminderOn(today) is ServiceReminder.Overdue or ServiceReminder.DueSoon)
-            .Take(8)
             .ToList();
     }
 
-    private void Open(VehicleRow vehicle) => Navigation.NavigateTo($"vehicles/{vehicle.Id}");
+    private static string MissingNames(VehicleRow v) =>
+        string.Join(", ", DocumentTypes.All.Where(t => !v.HasDocument(t)).Select(DocumentTypes.Name));
 
     private static string FirstName(string name) => name.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? name;
 }

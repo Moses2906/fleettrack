@@ -28,129 +28,76 @@ else
             <MudButton Href="@($"history?vehicle={v.Id}")" Variant="Variant.Outlined" StartIcon="@Icons.Material.Rounded.ManageSearch">History</MudButton>
             @if (canEdit)
             {
-                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Rounded.Edit" OnClick="EditAsync">Edit</MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.Edit" OnClick="EditAsync">Edit</MudButton>
             }
             @if (canDelete)
             {
-                <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Rounded.DeleteOutline" OnClick="DeleteAsync">Delete</MudButton>
+                <MudTooltip Text="Delete vehicle">
+                    <MudIconButton Icon="@Icons.Material.Rounded.DeleteOutline" Color="Color.Error" OnClick="DeleteAsync" aria-label="Delete vehicle" />
+                </MudTooltip>
             }
         </Actions>
     </PageHeader>
 
-    <MudGrid Spacing="4">
-        <MudItem xs="12" md="4">
-            <MudPaper Outlined="true" Elevation="0" Class="pa-5 h-100">
-                <MudText Typo="Typo.overline" Class="mud-text-secondary">Licence disk</MudText>
-                <MudText Typo="Typo.h5" Class="mt-1">@v.LicenceExpiryDate.ToString("dd MMMM yyyy")</MudText>
-                <div class="mt-2"><LicenceStatusChip ExpiryDate="v.LicenceExpiryDate" Today="Vehicles.Today" Size="Size.Medium" /></div>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="4">
-            <MudPaper Outlined="true" Elevation="0" Class="pa-5 h-100">
-                <MudText Typo="Typo.overline" Class="mud-text-secondary">Licensed to</MudText>
-                <MudText Typo="Typo.h6" Class="mt-1">@v.LicenceHolder</MudText>
-                <MudText Typo="Typo.body2" Class="mud-text-secondary">
-                    @(vehicle.HolderType == HolderType.Company ? "Company reg. no." : "ID number") @vehicle.HolderIdentifierForDisplay
-                </MudText>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="4">
-            <MudPaper Outlined="true" Elevation="0" Class="pa-5 h-100">
-                <MudText Typo="Typo.overline" Class="mud-text-secondary">Current driver</MudText>
-                @if (v.Driver is null)
-                {
-                    <MudText Typo="Typo.h6" Class="mt-1 mud-text-disabled">Unassigned</MudText>
-                }
-                else
-                {
-                    <MudText Typo="Typo.h6" Class="mt-1">@v.Driver</MudText>
-                    @if (vehicle.DriverPhone is not null)
-                    {
-                        <MudLink Href="@($"tel:{vehicle.DriverPhone.Replace(" ", "")}")" Typo="Typo.body2">@vehicle.DriverPhone</MudLink>
-                    }
-                }
-            </MudPaper>
-        </MudItem>
-
-        <MudItem xs="12" md="6">
-            <MudPaper Outlined="true" Elevation="0" Class="pa-5 h-100">
-                <div class="d-flex align-center justify-space-between mb-2">
-                    <MudText Typo="Typo.h6">Document checklist</MudText>
-                    @if (v.HasAllDocuments)
-                    {
-                        <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Text" Icon="@Icons.Material.Rounded.CheckCircle">Complete</MudChip>
-                    }
-                    else
-                    {
-                        <MudChip T="string" Size="Size.Small" Color="Color.Error" Variant="Variant.Text" Icon="@Icons.Material.Rounded.Error">@v.MissingDocumentCount missing</MudChip>
-                    }
+    @* One summary card with the key facts, laid out as simple label/value pairs. *@
+    <SectionCard Class="mb-4">
+        <div class="ft-facts-grid">
+            <div>
+                <div class="ft-fact-label">Licence disk</div>
+                <div class="d-flex align-center gap-2 flex-wrap">
+                    <span class="ft-fact-value">@v.LicenceExpiryDate.ToString("dd MMM yyyy")</span>
+                    <LicenceStatusChip ExpiryDate="v.LicenceExpiryDate" Today="Vehicles.Today" />
                 </div>
-                <MudText Typo="Typo.body2" Class="mud-text-secondary mb-2">
-                    @(canEdit ? "Tick a document when you have it. Uploading a copy below ticks it automatically." : "Which documents we have on file for this vehicle.")
-                </MudText>
-                @foreach (var (type, name) in DocumentNames)
+            </div>
+            <div>
+                <div class="ft-fact-label">Licensed to</div>
+                <div class="ft-fact-value">@v.LicenceHolder</div>
+                <div class="ft-muted">@(vehicle.HolderType == HolderType.Company ? "Reg. no." : "ID") @vehicle.HolderIdentifierForDisplay</div>
+            </div>
+            <div>
+                <div class="ft-fact-label">Driver</div>
+                <div class="ft-fact-value @(v.Driver is null ? "mud-text-disabled" : "")">@(v.Driver ?? "Unassigned")</div>
+                @if (vehicle.DriverPhone is not null)
                 {
-                    <div class="d-flex align-center justify-space-between py-1">
-                        <MudText>@name</MudText>
-                        <MudSwitch T="bool" Value="v.HasDocument(type)" ValueChanged="held => SetDocumentAsync(type, held)"
-                                   Color="Color.Success" UncheckedColor="Color.Error" ReadOnly="!canEdit"
-                                   aria-label="@name" />
-                    </div>
+                    <MudLink Href="@($"tel:{vehicle.DriverPhone.Replace(" ", "")}")" Typo="Typo.body2">@vehicle.DriverPhone</MudLink>
                 }
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" md="6">
-            <MudPaper Outlined="true" Elevation="0" Class="pa-5 h-100">
-                <MudText Typo="Typo.h6" Class="mb-3">Vehicle</MudText>
-                <MudSimpleTable Dense="true" Elevation="0" Bordered="false" Class="ft-facts">
-                    <tbody>
-                        <tr><td>Category</td><td>@v.Category</td></tr>
-                        <tr><td>Make & model</td><td>@v.MakeAndModel</td></tr>
-                        <tr><td>Year</td><td>@(v.Year?.ToString() ?? "—")</td></tr>
-                        <tr><td>VIN</td><td>@(vehicle.Vin ?? "—")</td></tr>
-                        <tr><td>Last updated</td><td>@SouthAfricanTime.ToLocal(vehicle.UpdatedAtUtc).ToString("dd MMM yyyy HH:mm")</td></tr>
-                    </tbody>
-                </MudSimpleTable>
-                <MudText Typo="Typo.subtitle2" Class="mt-4">Notes</MudText>
-                @* white-space: pre-line keeps the line breaks people typed; Razor still HTML-encodes the text. *@
-                <MudText Typo="Typo.body2" Style="white-space: pre-line" Class="@(vehicle.Notes is null ? "mud-text-disabled" : "")">@(vehicle.Notes ?? "No notes.")</MudText>
-            </MudPaper>
-        </MudItem>
+            </div>
+            <div>
+                <div class="ft-fact-label">VIN</div>
+                <div class="ft-fact-value">@(vehicle.Vin ?? "—")</div>
+            </div>
+        </div>
+        @if (vehicle.Notes is not null)
+        {
+            <MudDivider Class="my-3" />
+            <div class="ft-fact-label">Notes</div>
+            @* pre-line keeps typed line breaks; Razor still HTML-encodes the text. *@
+            <MudText Typo="Typo.body2" Style="white-space: pre-line">@vehicle.Notes</MudText>
+        }
+    </SectionCard>
 
-        <MudItem xs="12">
-            <MudPaper Outlined="true" Elevation="0">
-                <MudTabs Elevation="0" ApplyEffectsToContainer="true" TabPanelsClass="pa-2" @bind-ActivePanelIndex="activeTab">
-                    <MudTabPanel Text="Documents" Icon="@Icons.Material.Rounded.Description">
-                        <VehicleDocumentsPanel Vehicle="vehicle" OnChanged="LoadAsync" />
-                    </MudTabPanel>
-                    <MudTabPanel Text="Services" Icon="@Icons.Material.Rounded.Build">
-                        <VehicleServicesPanel VehicleId="v.Id" />
-                    </MudTabPanel>
-                    <MudTabPanel Text="Renewals" Icon="@Icons.Material.Rounded.Autorenew">
-                        <VehicleRenewalsPanel VehicleId="v.Id" CurrentExpiry="v.LicenceExpiryDate" OnChanged="LoadAsync" />
-                    </MudTabPanel>
-                </MudTabs>
-            </MudPaper>
-        </MudItem>
-    </MudGrid>
+    <SectionCard Flush="true">
+        <MudTabs Elevation="0" ApplyEffectsToContainer="true" @bind-ActivePanelIndex="activeTab">
+            <MudTabPanel Text="@($"Documents{(v.HasAllDocuments ? "" : $" · {v.MissingDocumentCount} missing")}")" Icon="@Icons.Material.Rounded.Description">
+                <VehicleDocumentsPanel Vehicle="vehicle" OnChanged="LoadAsync" />
+            </MudTabPanel>
+            <MudTabPanel Text="Services" Icon="@Icons.Material.Rounded.Build">
+                <VehicleServicesPanel VehicleId="v.Id" />
+            </MudTabPanel>
+            <MudTabPanel Text="Renewals" Icon="@Icons.Material.Rounded.Autorenew">
+                <VehicleRenewalsPanel VehicleId="v.Id" CurrentExpiry="v.LicenceExpiryDate" OnChanged="LoadAsync" />
+            </MudTabPanel>
+        </MudTabs>
+    </SectionCard>
 }
 
 @code {
     [Parameter] public int Id { get; set; }
 
-    /// <summary>?tab=documents opens the Documents tab directly (used by the Documents overview page).</summary>
+    /// <summary>?tab=documents|services|renewals opens that tab directly (used by links elsewhere).</summary>
     [SupplyParameterFromQuery(Name = "tab")] public string? Tab { get; set; }
 
     private int activeTab;
-
-    private static readonly (DocumentType Type, string Name)[] DocumentNames =
-    [
-        (DocumentType.Rc1, "RC1 (registration certificate)"),
-        (DocumentType.Brnc, "BRNC (business registration)"),
-        (DocumentType.ProxyLetter, "Proxy letter"),
-        (DocumentType.ProxyId, "Proxy ID"),
-    ];
-
     private VehicleDetails? vehicle;
     private bool notFound;
     private bool canEdit;
@@ -158,7 +105,7 @@ else
 
     protected override async Task OnParametersSetAsync()
     {
-        // Only used to decide which buttons to show; the service checks again on every action.
+        // Only used to decide which buttons to show; the services check again on every action.
         canEdit = await Permissions.HasAsync(Permission.EditRecords);
         canDelete = await Permissions.HasAsync(Permission.DeleteRecords);
         activeTab = Tab?.ToLowerInvariant() switch { "services" => 1, "renewals" => 2, _ => 0 };
@@ -169,14 +116,6 @@ else
     {
         vehicle = await Vehicles.GetAsync(Id);
         notFound = vehicle is null;
-    }
-
-    private async Task SetDocumentAsync(DocumentType type, bool held)
-    {
-        var result = await Vehicles.SetDocumentHeldAsync(Id, type, held);
-        if (!result.Succeeded)
-            Snackbar.Add(result.Error ?? "Couldn't update the checklist.", Severity.Error);
-        await LoadAsync();
     }
 
     private async Task EditAsync()
@@ -195,7 +134,7 @@ else
         var registration = vehicle!.Row.RegistrationNumber;
         var parameters = new DialogParameters<ConfirmDeleteDialog>
         {
-            { d => d.Message, $"This permanently deletes {registration} together with all its documents, services and licence renewals. Use this for POPIA deletion requests or vehicles entered by mistake." },
+            { d => d.Message, $"This permanently deletes {registration} together with all its documents, invoices, services and licence renewals. Use this for POPIA deletion requests or vehicles entered by mistake." },
             { d => d.ConfirmText, registration },
         };
         var dialog = await Dialogs.ShowAsync<ConfirmDeleteDialog>("Delete vehicle", parameters);

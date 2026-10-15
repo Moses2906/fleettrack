@@ -32,16 +32,21 @@
 Counts of expired licence disks, disks due within 30 days, vehicles with missing documents and services due, each linking straight to the matching filtered list.
 
 ### Vehicles
-- Table sorted by registration number with instant search. Searching `ca123456` finds `CA 123-456`.
+- A calm one-line table, registration first. **Click a vehicle to expand it** in place: licence holder, category, VIN, driver's phone, documents, notes and quick actions (open, documents, history, edit, renew).
+- Instant search: searching `ca123456` finds `CA 123-456`. Colour is only used for problems (expired or due disks, missing documents), so they stand out.
+- **"Expiring in" month filter** to see which disks are due in, say, November.
 - Filters for disk status, category, driver and missing documents.
 - Colour-coded disk status badges: **valid**, **due within 30 days**, **expired**. Each badge also has an icon and text, so colour is never the only signal.
 - South African registration validation (provincial, Western Cape and personalised formats) and duplicate detection that ignores spacing.
 - Licence holders can be companies (CIPC registration number) or individuals (SA ID number, checked with the Luhn check digit and masked on screen).
-- Compact card layout on phones.
+- Compact cards on phones that expand when tapped.
 
 | Vehicles | Vehicle documents |
 |---|---|
 | ![Vehicles](docs/screenshots/vehicles.png) | ![Documents](docs/screenshots/vehicle-documents.png) |
+
+### Drivers
+A simple list of the people who drive the vehicles, with phone numbers (tap to call) and the registration numbers each one drives. Licence holders (who a vehicle is registered to) and vehicle categories are managed under Administration, and can also be added straight from the vehicle form.
 
 ### Documents
 - Upload RC1, BRNC, proxy letter and proxy ID copies (PDF, JPG or PNG, up to 10 MB).
@@ -50,17 +55,23 @@ Counts of expired licence disks, disks due within 30 days, vehicles with missing
 - An overview page showing which copies are stored, paper-only or missing for every vehicle.
 
 ### Service and maintenance
-- Log services and repairs: date, odometer, type of work, workshop, cost and notes. Odometer readings that go backwards are caught as likely typos.
+- **Mark a due service as done** in one short form: what was done, cost and odometer, an optional **invoice upload** (PDF or photo), and **"Book the next service?"**: same date next year (default), in 6 months, pick a date, or don't book. The booking drives the reminder email.
+- Log any other repair the same way. Odometer readings that go backwards are caught as likely typos. Invoices are stored and checked like vehicle documents.
 - Optional next-service date with reminders on the dashboard, the Services page and by email.
 
 ### Licence renewals
-- Record a renewal: purchase date, new expiry, amount, reference and who processed it. **Saving a renewal updates the vehicle's expiry date in the same transaction.**
-- Track what happened afterwards (disk handed to driver, fitted to vehicle, copy filed) with dates and notes.
+- Renew a disk in **one form**: when it was bought, valid until, amount, reference, who processed it, and tick boxes for **handed to driver, fitted to vehicle and copy filed**. **Saving a renewal updates the vehicle's expiry date in the same transaction.**
+- Anything not done yet shows as a one-click tag on the Renewals page.
+- **Disks due by month**: a row of the next 12 months with counts, each opening that month's vehicles.
 - Entering an old renewal for the history never moves the current expiry date backwards, and deleting a mistaken renewal restores the previous date.
 
-| Renewals | Vehicle history |
+| Marking a service as done | Renewals |
 |---|---|
-| ![Renewals](docs/screenshots/renewals.png) | ![History](docs/screenshots/history.png) |
+| ![Service done](docs/screenshots/service-done.png) | ![Renewals](docs/screenshots/renewals.png) |
+
+| History by month |
+|---|
+| ![History](docs/screenshots/history.png) |
 
 ### Email reminders
 - A morning email to the people an admin chooses. It covers licence disks 30 and 7 days before expiry, on the day and weekly while expired, and services 7 days before and weekly while overdue.
@@ -71,7 +82,9 @@ Counts of expired licence disks, disks due within 30 days, vehicles with missing
 <img src="docs/screenshots/reminder-email.png" alt="Reminder email" width="520">
 
 ### Vehicle history and PDF export
-Search any registration to see a five-year timeline of renewals and services, newest first, then export it as a PDF report.
+Two views, both newest first and exportable as PDF:
+- **By vehicle:** search any registration to see a five-year timeline of renewals and services.
+- **By month:** every renewal and repair across the whole fleet in a chosen month, with totals (handy for "what did we spend in March?").
 
 <img src="docs/screenshots/history-pdf.png" alt="History PDF report" width="420">
 
@@ -214,7 +227,7 @@ On a real installation, the first admin is created from the `BootstrapAdmin__*` 
 dotnet test
 ```
 
-The 182 tests need no database: they use EF Core's in-memory provider and a temporary folder for files. They cover:
+The 209 tests need no database: they use EF Core's in-memory provider and a temporary folder for files. They cover:
 
 - **Business rules:** disk expiry status and its 30-day boundary; renewals updating the expiry date (and never moving it backwards); reverting a deleted renewal; service reminders; odometer checks; SA registration, ID number and company number validation; file-type detection.
 - **Role permissions:** the permission table, plus Staff being refused every create, edit, upload and delete when calling the services directly.
@@ -223,6 +236,8 @@ The 182 tests need no database: they use EF Core's in-memory provider and a temp
 - **Documents:** disguised files and files over 10 MB are rejected, replacing a copy deletes the old file, tampered files are refused, and deleting a vehicle deletes its files.
 - **PDF:** a report is generated for every seeded vehicle.
 - **Email reminders:** milestone dates, one email per opted-in active user, no duplicates, retries after a failed send, and no HTML injection from data typed into FleetTrack.
+- **Services and renewals:** booking the next service (same date next year, including 29 February), invoices (disguised files rejected, files removed with their service or vehicle), and renewals saved together with their follow-up steps.
+- **Months:** month boundaries, the 12-month disk outlook, and fleet history by month.
 
 ## Configuration
 

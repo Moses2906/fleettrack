@@ -1,0 +1,24 @@
+@* A calm one-line row for lists: main text on the left, a status and an action on the right. *@
+<div class="ft-list-row @(Href is null ? "" : "ft-list-row-link")" @onclick="Navigate">
+    <div class="ft-list-row-main">
+        @Main
+    </div>
+    <div class="ft-list-row-side">
+        @Side
+    </div>
+</div>
+
+@code {
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Parameter, EditorRequired] public RenderFragment Main { get; set; } = default!;
+    [Parameter] public RenderFragment? Side { get; set; }
+
+    /// <summary>Optional: clicking the row (outside its buttons) opens this page.</summary>
+    [Parameter] public string? Href { get; set; }
+
+    private void Navigate()
+    {
+        if (Href is not null)
+            Navigation.NavigateTo(Href);
+    }
+}

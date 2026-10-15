@@ -86,7 +86,7 @@
                     <section>
                         <MudText Typo="Typo.subtitle2" Class="ft-section-title">Next service</MudText>
                         @* Booking the next service sets its reminder, so the morning email goes out in time. *@
-                        <MudRadioGroup T="NextServiceBooking" @bind-Value="booking" Class="d-flex flex-column">
+                        <MudRadioGroup T="NextServiceBooking" @bind-Value="booking" Class="ft-radio-stack">
                             <MudRadio Value="NextServiceBooking.SameDateNextYear" Color="Color.Primary">
                                 Same date next year @(form.ServiceDate is { } d ? $"({d.AddYears(1):dd MMM yyyy})" : "")
                             </MudRadio>
