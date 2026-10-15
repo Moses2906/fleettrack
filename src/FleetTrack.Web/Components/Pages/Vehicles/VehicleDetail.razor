@@ -123,10 +123,10 @@ else
                         <VehicleDocumentsPanel Vehicle="vehicle" OnChanged="LoadAsync" />
                     </MudTabPanel>
                     <MudTabPanel Text="Services" Icon="@Icons.Material.Rounded.Build">
-                        <EmptyState Icon="@Icons.Material.Rounded.Build" Title="Service log arrives in Phase 5" />
+                        <VehicleServicesPanel VehicleId="v.Id" />
                     </MudTabPanel>
                     <MudTabPanel Text="Renewals" Icon="@Icons.Material.Rounded.Autorenew">
-                        <EmptyState Icon="@Icons.Material.Rounded.Autorenew" Title="Licence renewals arrive in Phase 5" />
+                        <VehicleRenewalsPanel VehicleId="v.Id" CurrentExpiry="v.LicenceExpiryDate" OnChanged="LoadAsync" />
                     </MudTabPanel>
                 </MudTabs>
             </MudPaper>

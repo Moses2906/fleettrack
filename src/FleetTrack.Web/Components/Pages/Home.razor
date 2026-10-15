@@ -1,6 +1,7 @@
 @page "/"
 @attribute [Authorize(Policy = nameof(Permission.ViewRecords))]
 @inject VehicleService Vehicles
+@inject ServiceLogService ServiceLog
 @inject NavigationManager Navigation
 
 <PageTitle>Dashboard · FleetTrack</PageTitle>
@@ -87,17 +88,51 @@ else
                 }
             </MudPaper>
         </MudItem>
+        <MudItem xs="12">
+            <MudPaper Outlined="true" Elevation="0">
+                <div class="d-flex align-center justify-space-between pa-4 pb-2">
+                    <MudText Typo="Typo.h6">Services due</MudText>
+                    <MudButton Href="services" Size="Size.Small" EndIcon="@Icons.Material.Rounded.ChevronRight">View all</MudButton>
+                </div>
+                @if (servicesDue.Count == 0)
+                {
+                    <EmptyState Icon="@Icons.Material.Rounded.EventAvailable" Title="No services due" Message="Nothing is overdue or due in the next 30 days." />
+                }
+                else
+                {
+                    <MudList T="ServiceReminderRow" Class="pt-0">
+                        @foreach (var r in servicesDue)
+                        {
+                            <MudListItem T="ServiceReminderRow" Href="@($"vehicles/{r.VehicleId}?tab=services")">
+                                <div class="d-flex align-center justify-space-between gap-3 flex-wrap">
+                                    <div>
+                                        <span class="ft-reg">@r.RegistrationNumber</span>
+                                        <MudText Typo="Typo.body2" Class="mud-text-secondary">@r.MakeAndModel · last serviced @r.LastServiceDate.ToString("dd MMM yyyy")</MudText>
+                                    </div>
+                                    <ServiceReminderChip DueDate="r.NextServiceDue" Today="today" />
+                                </div>
+                            </MudListItem>
+                        }
+                    </MudList>
+                }
+            </MudPaper>
+        </MudItem>
     </MudGrid>
 }
 
 @code {
     private DashboardSummary? summary;
+    private List<ServiceReminderRow> servicesDue = [];
     private DateOnly today;
 
     protected override async Task OnInitializedAsync()
     {
         today = Vehicles.Today;
         summary = await Vehicles.GetDashboardAsync();
+        servicesDue = (await ServiceLog.RemindersAsync())
+            .Where(r => r.ReminderOn(today) is ServiceReminder.Overdue or ServiceReminder.DueSoon)
+            .Take(8)
+            .ToList();
     }
 
     private void Open(VehicleRow vehicle) => Navigation.NavigateTo($"vehicles/{vehicle.Id}");

@@ -1,0 +1,133 @@
+@* One renewal: the disk details and a short timeline of what happened afterwards. *@
+@inject RenewalService Renewals
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+
+<MudPaper Outlined="true" Elevation="0" Class="pa-4">
+    <div class="d-flex flex-wrap align-start justify-space-between gap-2">
+        <div>
+            @if (ShowVehicle)
+            {
+                <MudLink Href="@($"vehicles/{Renewal.VehicleId}?tab=renewals")" Class="ft-reg" Underline="Underline.Hover">@Renewal.RegistrationNumber</MudLink>
+            }
+            <MudText Typo="Typo.subtitle1">
+                <b>Valid until @Renewal.NewExpiryDate.ToString("dd MMM yyyy")</b>
+            </MudText>
+            <MudText Typo="Typo.body2" Class="mud-text-secondary">
+                Bought @Renewal.DatePurchased.ToString("dd MMM yyyy") · @DisplayNames.Money(Renewal.AmountPaid)
+                @if (Renewal.ReferenceNumber is not null)
+                {
+                    <span> · Ref @Renewal.ReferenceNumber</span>
+                }
+                · by @Renewal.ProcessedBy
+            </MudText>
+            @if (Renewal.PreviousExpiryDate is { } previous)
+            {
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">Replaced the disk that expired @previous.ToString("dd MMM yyyy")</MudText>
+            }
+        </div>
+        <div class="d-flex gap-1">
+            @if (CanEdit)
+            {
+                <MudTooltip Text="Edit amount, reference or notes">
+                    <MudIconButton Icon="@Icons.Material.Rounded.Edit" Size="Size.Small" OnClick="EditAsync" aria-label="Edit renewal" />
+                </MudTooltip>
+            }
+            @if (CanDelete)
+            {
+                <MudTooltip Text="Delete this renewal">
+                    <MudIconButton Icon="@Icons.Material.Rounded.DeleteOutline" Size="Size.Small" Color="Color.Error" OnClick="DeleteAsync" aria-label="Delete renewal" />
+                </MudTooltip>
+            }
+        </div>
+    </div>
+
+    @if (Renewal.Notes is not null)
+    {
+        <MudText Typo="Typo.body2" Class="mt-2" Style="white-space: pre-line">@Renewal.Notes</MudText>
+    }
+
+    <div class="ft-steps mt-3">
+        @foreach (var step in Renewal.Steps)
+        {
+            <div class="ft-step ft-step-done">
+                <MudIcon Icon="@Icons.Material.Rounded.CheckCircle" Color="Color.Success" Size="Size.Small" />
+                <div>
+                    <MudText Typo="Typo.body2"><b>@DisplayNames.Of(step.StepType)</b> · @step.StepDate.ToString("dd MMM yyyy")</MudText>
+                    @if (step.Notes is not null)
+                    {
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">@step.Notes</MudText>
+                    }
+                </div>
+                @if (CanDelete)
+                {
+                    <MudIconButton Icon="@Icons.Material.Rounded.Close" Size="Size.Small" Class="ml-auto" OnClick="() => DeleteStepAsync(step)" aria-label="Remove step" />
+                }
+            </div>
+        }
+        @foreach (var outstanding in Renewal.OutstandingSteps)
+        {
+            <div class="ft-step">
+                <MudIcon Icon="@Icons.Material.Rounded.RadioButtonUnchecked" Size="Size.Small" Class="mud-text-disabled" />
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">@DisplayNames.Of(outstanding)</MudText>
+                @if (CanEdit)
+                {
+                    <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary" Class="ml-auto" OnClick="() => AddStepAsync(outstanding)">Mark done</MudButton>
+                }
+            </div>
+        }
+    </div>
+    @if (CanEdit)
+    {
+        <MudButton Size="Size.Small" Variant="Variant.Text" StartIcon="@Icons.Material.Rounded.Add" Class="mt-1" OnClick="() => AddStepAsync(RenewalStepType.Other)">Add another note</MudButton>
+    }
+</MudPaper>
+
+@code {
+    [Parameter, EditorRequired] public RenewalRow Renewal { get; set; } = default!;
+    [Parameter] public bool ShowVehicle { get; set; }
+    [Parameter] public bool CanEdit { get; set; }
+    [Parameter] public bool CanDelete { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private async Task AddStepAsync(RenewalStepType type)
+    {
+        var dialog = await Dialogs.ShowAsync<RenewalStepDialog>(DisplayNames.Of(type),
+            new DialogParameters<RenewalStepDialog> { { d => d.RenewalId, Renewal.Id }, { d => d.StepType, type } });
+        if ((await dialog.Result) is { Canceled: false })
+            await OnChanged.InvokeAsync();
+    }
+
+    private async Task EditAsync()
+    {
+        var dialog = await Dialogs.ShowAsync<RenewalDialog>("Edit renewal", new DialogParameters<RenewalDialog>
+        {
+            { d => d.VehicleId, Renewal.VehicleId },
+            { d => d.RenewalId, Renewal.Id },
+        });
+        if ((await dialog.Result) is { Canceled: false })
+        {
+            Snackbar.Add("Renewal updated.", Severity.Success);
+            await OnChanged.InvokeAsync();
+        }
+    }
+
+    private async Task DeleteAsync()
+    {
+        var confirmed = await Dialogs.ShowMessageBoxAsync("Delete renewal",
+            $"Delete the renewal bought on {Renewal.DatePurchased:dd MMM yyyy}? If it is the latest one, the vehicle's expiry date goes back to {Renewal.PreviousExpiryDate:dd MMM yyyy}.",
+            yesText: "Delete", cancelText: "Cancel");
+        if (confirmed != true)
+            return;
+
+        await Renewals.DeleteAsync(Renewal.Id);
+        Snackbar.Add("Renewal deleted.", Severity.Success);
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task DeleteStepAsync(RenewalStepRow step)
+    {
+        await Renewals.DeleteStepAsync(step.Id);
+        await OnChanged.InvokeAsync();
+    }
+}

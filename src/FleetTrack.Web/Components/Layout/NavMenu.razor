@@ -1,6 +1,8 @@
 <MudNavMenu Class="pt-4 px-2" Rounded="true" Margin="Margin.Dense" Color="Color.Primary">
     <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Rounded.SpaceDashboard">Dashboard</MudNavLink>
     <MudNavLink Href="vehicles" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Rounded.DirectionsCar">Vehicles</MudNavLink>
+    <MudNavLink Href="services" Icon="@Icons.Material.Rounded.Build">Services</MudNavLink>
+    <MudNavLink Href="renewals" Icon="@Icons.Material.Rounded.Autorenew">Renewals</MudNavLink>
     <AuthorizeView Policy="@nameof(Permission.ViewDocuments)">
         <MudNavLink Href="documents" Icon="@Icons.Material.Rounded.Description">Documents</MudNavLink>
     </AuthorizeView>

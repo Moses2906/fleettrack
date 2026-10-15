@@ -1,0 +1,73 @@
+@inject RenewalService Renewals
+@inject PermissionService Permissions
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+
+<div class="d-flex flex-wrap align-center justify-space-between gap-2 pa-2">
+    <MudText Typo="Typo.body2" Class="mud-text-secondary">
+        @if (renewals is { Count: > 0 })
+        {
+            <span>@renewals.Count renewals · @DisplayNames.Money(renewals.Sum(r => r.AmountPaid)) in total</span>
+        }
+    </MudText>
+    @if (canEdit)
+    {
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.Autorenew" Size="Size.Small" OnClick="RenewAsync">Record renewal</MudButton>
+    }
+</div>
+
+@if (renewals is null)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (renewals.Count == 0)
+{
+    <EmptyState Icon="@Icons.Material.Rounded.Autorenew" Title="No renewals recorded yet" />
+}
+else
+{
+    <MudStack Spacing="3" Class="pa-2">
+        @foreach (var renewal in renewals)
+        {
+            <RenewalCard Renewal="renewal" CanEdit="canEdit" CanDelete="canDelete" OnChanged="ChangedAsync" />
+        }
+    </MudStack>
+}
+
+@code {
+    [Parameter, EditorRequired] public int VehicleId { get; set; }
+    [Parameter, EditorRequired] public DateOnly CurrentExpiry { get; set; }
+
+    /// <summary>Raised when the vehicle's expiry date may have changed, so the page can refresh.</summary>
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private List<RenewalRow>? renewals;
+    private bool canEdit, canDelete;
+
+    protected override async Task OnInitializedAsync()
+    {
+        canEdit = await Permissions.HasAsync(Permission.EditRecords);
+        canDelete = await Permissions.HasAsync(Permission.DeleteRecords);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync() => renewals = await Renewals.ListAsync(VehicleId);
+
+    private async Task ChangedAsync()
+    {
+        await LoadAsync();
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task RenewAsync()
+    {
+        var dialog = await Dialogs.ShowAsync<RenewalDialog>("Record licence renewal",
+            new DialogParameters<RenewalDialog> { { d => d.VehicleId, VehicleId }, { d => d.CurrentExpiry, CurrentExpiry } },
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        if ((await dialog.Result) is { Canceled: false })
+        {
+            Snackbar.Add("Renewal saved and the vehicle's expiry date updated.", Severity.Success);
+            await ChangedAsync();
+        }
+    }
+}

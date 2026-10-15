@@ -1,0 +1,117 @@
+@page "/renewals"
+@attribute [Authorize(Policy = nameof(Permission.ViewRecords))]
+@inject RenewalService Renewals
+@inject VehicleService Vehicles
+@inject PermissionService Permissions
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+
+<PageTitle>Licence renewals · FleetTrack</PageTitle>
+
+<PageHeader Title="Licence renewals" Subtitle="Disks to renew, and what happened after each new disk was bought." />
+
+<MudGrid Spacing="4">
+    <MudItem xs="12" lg="5">
+        <MudPaper Outlined="true" Elevation="0">
+            <MudText Typo="Typo.h6" Class="pa-4 pb-2">To renew</MudText>
+            @if (toRenew is null)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+            }
+            else if (toRenew.Count == 0)
+            {
+                <EmptyState Icon="@Icons.Material.Rounded.Verified" Title="Nothing to renew" Message="No disk is expired or due in the next 30 days." />
+            }
+            else
+            {
+                <MudList T="VehicleRow" Class="pt-0">
+                    @foreach (var v in toRenew)
+                    {
+                        <MudListItem T="VehicleRow">
+                            <div class="d-flex flex-wrap align-center justify-space-between gap-2">
+                                <div>
+                                    <MudLink Href="@($"vehicles/{v.Id}?tab=renewals")" Class="ft-reg" Underline="Underline.Hover">@v.RegistrationNumber</MudLink>
+                                    <MudText Typo="Typo.body2" Class="mud-text-secondary">@v.MakeAndModel · expires @v.LicenceExpiryDate.ToString("dd MMM yyyy")</MudText>
+                                </div>
+                                <div class="d-flex align-center gap-2">
+                                    <LicenceStatusChip ExpiryDate="v.LicenceExpiryDate" Today="today" />
+                                    @if (canEdit)
+                                    {
+                                        <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" OnClick="() => RenewAsync(v)">Renew</MudButton>
+                                    }
+                                </div>
+                            </div>
+                        </MudListItem>
+                    }
+                </MudList>
+            }
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" lg="7">
+        <MudPaper Outlined="true" Elevation="0" Class="pa-4">
+            <div class="d-flex flex-wrap align-center justify-space-between gap-2 mb-3">
+                <MudText Typo="Typo.h6">Recent renewals</MudText>
+                <MudSwitch @bind-Value="outstandingOnly" Color="Color.Primary" Label="Only with steps outstanding" />
+            </div>
+            @if (renewals is null)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+            }
+            else if (!VisibleRenewals.Any())
+            {
+                <EmptyState Icon="@Icons.Material.Rounded.TaskAlt" Title="Nothing outstanding" Message="Every recent disk has been handed over, fitted and filed." />
+            }
+            else
+            {
+                <MudStack Spacing="3">
+                    @foreach (var renewal in VisibleRenewals)
+                    {
+                        <RenewalCard Renewal="renewal" ShowVehicle="true" CanEdit="canEdit" CanDelete="canDelete" OnChanged="LoadAsync" />
+                    }
+                </MudStack>
+            }
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private List<VehicleRow>? toRenew;
+    private List<RenewalRow>? renewals;
+    private DateOnly today;
+    private bool outstandingOnly;
+    private bool canEdit, canDelete;
+
+    // The last 90 days of renewals; older ones are on each vehicle's page and in its history.
+    private IEnumerable<RenewalRow> VisibleRenewals =>
+        (renewals ?? []).Where(r => r.DatePurchased >= today.AddDays(-90) && (!outstandingOnly || r.OutstandingSteps.Any()));
+
+    protected override async Task OnInitializedAsync()
+    {
+        today = Renewals.Today;
+        canEdit = await Permissions.HasAsync(Permission.EditRecords);
+        canDelete = await Permissions.HasAsync(Permission.DeleteRecords);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        toRenew = (await Vehicles.ListAsync())
+            .Where(v => v.StatusOn(today) != LicenceStatus.Valid)
+            .OrderBy(v => v.LicenceExpiryDate)
+            .ToList();
+        renewals = await Renewals.ListAsync();
+    }
+
+    private async Task RenewAsync(VehicleRow vehicle)
+    {
+        var dialog = await Dialogs.ShowAsync<RenewalDialog>($"Renew {vehicle.RegistrationNumber}",
+            new DialogParameters<RenewalDialog> { { d => d.VehicleId, vehicle.Id }, { d => d.CurrentExpiry, vehicle.LicenceExpiryDate } },
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        if ((await dialog.Result) is { Canceled: false })
+        {
+            Snackbar.Add($"{vehicle.RegistrationNumber} renewed. Record the handover, fitting and filing below as they happen.", Severity.Success);
+            await LoadAsync();
+        }
+    }
+}

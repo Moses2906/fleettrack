@@ -1,0 +1,98 @@
+@inject ServiceLogService ServiceLog
+@inject PermissionService Permissions
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+
+<div class="d-flex flex-wrap align-center justify-space-between gap-2 pa-2">
+    <div class="d-flex align-center gap-2 flex-wrap">
+        @if (services is { Count: > 0 })
+        {
+            <ServiceReminderChip DueDate="NextDue" Today="ServiceLog.Today" />
+            <MudText Typo="Typo.body2" Class="mud-text-secondary">@services.Count records · @DisplayNames.Money(services.Sum(s => s.Cost)) in total</MudText>
+        }
+    </div>
+    @if (canAdd)
+    {
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.Add" Size="Size.Small" OnClick="() => EditAsync(null)">Log service</MudButton>
+    }
+</div>
+
+<MudTable Items="services" Loading="services is null" Hover="true" Dense="true" Elevation="0" Breakpoint="Breakpoint.Sm" RowsPerPage="10">
+    <HeaderContent>
+        <MudTh>Date</MudTh><MudTh>Work</MudTh><MudTh>Workshop</MudTh><MudTh Style="text-align: right">Odometer</MudTh>
+        <MudTh Style="text-align: right">Cost</MudTh><MudTh></MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Date" Style="white-space: nowrap">@context.ServiceDate.ToString("dd MMM yyyy")</MudTd>
+        <MudTd DataLabel="Work">
+            <MudText Typo="Typo.body2"><b>@DisplayNames.Of(context.WorkType)</b></MudText>
+            <MudText Typo="Typo.caption" Class="mud-text-secondary">@context.Description</MudText>
+            @if (context.Notes is not null)
+            {
+                <MudText Typo="Typo.caption" Class="d-block mud-text-secondary" Style="white-space: pre-line"><i>@context.Notes</i></MudText>
+            }
+        </MudTd>
+        <MudTd DataLabel="Workshop">@context.Workshop</MudTd>
+        <MudTd DataLabel="Odometer" Style="text-align: right; white-space: nowrap">@context.OdometerKm.ToString("#,##0") km</MudTd>
+        <MudTd DataLabel="Cost" Style="text-align: right; white-space: nowrap">@DisplayNames.Money(context.Cost)</MudTd>
+        <MudTd Style="text-align: right; white-space: nowrap">
+            @if (canEdit)
+            {
+                <MudIconButton Icon="@Icons.Material.Rounded.Edit" Size="Size.Small" OnClick="() => EditAsync(context.Id)" aria-label="Edit service" />
+            }
+            @if (canDelete)
+            {
+                <MudIconButton Icon="@Icons.Material.Rounded.DeleteOutline" Size="Size.Small" Color="Color.Error" OnClick="() => DeleteAsync(context)" aria-label="Delete service" />
+            }
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        <EmptyState Icon="@Icons.Material.Rounded.Build" Title="No services logged yet" Message="Log each service or repair to build up this vehicle's history." />
+    </NoRecordsContent>
+    <PagerContent>
+        <MudTablePager HideRowsPerPage="true" />
+    </PagerContent>
+</MudTable>
+
+@code {
+    [Parameter, EditorRequired] public int VehicleId { get; set; }
+
+    private List<ServiceRow>? services;
+    private bool canAdd, canEdit, canDelete;
+
+    // The latest service decides the next reminder (see ServiceRules.NextServiceDue).
+    private DateOnly? NextDue => services?.FirstOrDefault()?.NextServiceDueDate;
+
+    protected override async Task OnInitializedAsync()
+    {
+        canAdd = await Permissions.HasAsync(Permission.AddServiceRecords);
+        canEdit = await Permissions.HasAsync(Permission.EditRecords);
+        canDelete = await Permissions.HasAsync(Permission.DeleteRecords);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync() => services = await ServiceLog.ListAsync(VehicleId);
+
+    private async Task EditAsync(int? serviceId)
+    {
+        var dialog = await Dialogs.ShowAsync<ServiceDialog>(serviceId is null ? "Log service" : "Edit service",
+            new DialogParameters<ServiceDialog> { { d => d.VehicleId, VehicleId }, { d => d.ServiceId, serviceId } },
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        if ((await dialog.Result) is { Canceled: false })
+        {
+            Snackbar.Add(serviceId is null ? "Service logged." : "Service updated.", Severity.Success);
+            await LoadAsync();
+        }
+    }
+
+    private async Task DeleteAsync(ServiceRow service)
+    {
+        var confirmed = await Dialogs.ShowMessageBoxAsync("Delete service",
+            $"Delete the {DisplayNames.Of(service.WorkType).ToLowerInvariant()} on {service.ServiceDate:dd MMM yyyy}?", yesText: "Delete", cancelText: "Cancel");
+        if (confirmed != true)
+            return;
+        await ServiceLog.DeleteAsync(service.Id);
+        Snackbar.Add("Service deleted.", Severity.Success);
+        await LoadAsync();
+    }
+}

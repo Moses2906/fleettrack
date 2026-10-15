@@ -1,0 +1,26 @@
+@if (Reminder != ServiceReminder.None)
+{
+    <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="@Colour" Icon="@Icons.Material.Rounded.Build" Class="ma-0">@Label</MudChip>
+}
+
+@code {
+    [Parameter, EditorRequired] public DateOnly? DueDate { get; set; }
+    [Parameter, EditorRequired] public DateOnly Today { get; set; }
+
+    private ServiceReminder Reminder => ServiceRules.GetReminder(DueDate, Today);
+    private int Days => DueDate!.Value.DayNumber - Today.DayNumber;
+
+    private Color Colour => Reminder switch
+    {
+        ServiceReminder.Overdue => Color.Error,
+        ServiceReminder.DueSoon => Color.Warning,
+        _ => Color.Default,
+    };
+
+    private string Label => Reminder switch
+    {
+        ServiceReminder.Overdue => $"Service overdue by {-Days} days",
+        ServiceReminder.DueSoon => Days == 0 ? "Service due today" : $"Service due in {Days} days",
+        _ => $"Next service {DueDate:dd MMM yyyy}",
+    };
+}

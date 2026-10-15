@@ -1,0 +1,140 @@
+@inject ServiceLogService ServiceLog
+@inject VehicleService Vehicles
+
+<MudDialog>
+    <DialogContent>
+        @if (form is not null)
+        {
+            <EditForm Model="form" OnValidSubmit="SaveAsync" id="service-form">
+                <DataAnnotationsValidator />
+                <MudGrid Spacing="3">
+                    @if (VehicleId is null && ServiceId is null)
+                    {
+                        <MudItem xs="12">
+                            @* Type to search: works for a fleet of any size. *@
+                            <MudAutocomplete T="VehicleRow" Value="selectedVehicle" ValueChanged="OnVehicleChosen" SearchFunc="SearchVehicles"
+                                             ToStringFunc="@(v => v is null ? "" : $"{v.RegistrationNumber} · {v.MakeAndModel}")"
+                                             Label="Vehicle" Variant="Variant.Outlined" ResetValueOnEmptyText="true" AutoFocus="true" />
+                            <ValidationMessage For="() => form.VehicleId" class="validation-message" />
+                        </MudItem>
+                    }
+                    <MudItem xs="12" sm="6">
+                        <MudDatePicker @bind-Date="form.ServiceDate" For="() => form.ServiceDate" Label="Date of service"
+                                       Variant="Variant.Outlined" DateFormat="dd MMM yyyy" Editable="true" MaxDate="DateTime.Today" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudNumericField @bind-Value="form.OdometerKm" For="() => form.OdometerKm" Label="Odometer" Variant="Variant.Outlined"
+                                         Adornment="Adornment.End" AdornmentText="km" HideSpinButtons="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="WorkType" @bind-Value="form.WorkType" Label="Type of work" Variant="Variant.Outlined">
+                            @foreach (var type in Enum.GetValues<WorkType>())
+                            {
+                                <MudSelectItem Value="type">@DisplayNames.Of(type)</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudNumericField @bind-Value="form.Cost" For="() => form.Cost" Label="Cost" Variant="Variant.Outlined"
+                                         Adornment="Adornment.Start" AdornmentText="R" HideSpinButtons="true" Format="0.00" />
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="form.Description" For="() => form.Description" Label="Work done" Variant="Variant.Outlined"
+                                      Placeholder="e.g. Minor service: oil, filter and safety check" />
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="form.Workshop" For="() => form.Workshop" Label="Workshop or supplier" Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudDatePicker @bind-Date="form.NextServiceDueDate" For="() => form.NextServiceDueDate" Label="Next service due (optional)"
+                                       Variant="Variant.Outlined" DateFormat="dd MMM yyyy" Editable="true" Clearable="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6" Class="d-flex align-center gap-2 flex-wrap">
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">Quick pick:</MudText>
+                        @foreach (var months in new[] { 3, 6, 12 })
+                        {
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" OnClick="() => SetNext(months)">+@months months</MudChip>
+                        }
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="form.Notes" For="() => form.Notes" Label="Notes (optional)" Variant="Variant.Outlined"
+                                      Lines="2" Sizing="InputSizing.Auto" MaxLines="6" MaxLength="2000" />
+                    </MudItem>
+                </MudGrid>
+                @if (error is not null)
+                {
+                    <MudAlert Severity="Severity.Error" Class="mt-4" Dense="true">@error</MudAlert>
+                }
+            </EditForm>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => Dialog.Cancel()">Cancel</MudButton>
+        <MudButton ButtonType="ButtonType.Submit" form="service-form" Variant="Variant.Filled" Color="Color.Primary" Disabled="saving || form is null">
+            @(ServiceId is null ? "Log service" : "Save changes")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+
+    /// <summary>Set to log a service for this vehicle without asking which one.</summary>
+    [Parameter] public int? VehicleId { get; set; }
+
+    /// <summary>Set to edit an existing service record (admins only).</summary>
+    [Parameter] public int? ServiceId { get; set; }
+
+    private ServiceForm? form;
+    private List<VehicleRow> vehicles = [];
+    private VehicleRow? selectedVehicle;
+    private string? error;
+    private bool saving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (ServiceId is { } id)
+        {
+            form = await ServiceLog.GetFormAsync(id);
+            if (form is null)
+                error = "This service record has been deleted.";
+            return;
+        }
+
+        form = new ServiceForm { VehicleId = VehicleId, ServiceDate = DateTime.Today };
+        if (VehicleId is null)
+            vehicles = await Vehicles.ListAsync();
+    }
+
+    private Task<IEnumerable<VehicleRow>> SearchVehicles(string? text, CancellationToken _)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return Task.FromResult<IEnumerable<VehicleRow>>(vehicles);
+        var key = RegistrationNumbers.ToKey(text);
+        return Task.FromResult(vehicles.Where(v =>
+            (key.Length > 0 && RegistrationNumbers.ToKey(v.RegistrationNumber).Contains(key))
+            || v.MakeAndModel.Contains(text, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    private void OnVehicleChosen(VehicleRow? vehicle)
+    {
+        selectedVehicle = vehicle;
+        form!.VehicleId = vehicle?.Id;
+    }
+
+    private void SetNext(int months) =>
+        form!.NextServiceDueDate = (form.ServiceDate ?? DateTime.Today).AddMonths(months);
+
+    private async Task SaveAsync()
+    {
+        saving = true;
+        error = null;
+        var result = ServiceId is { } id ? await ServiceLog.UpdateAsync(id, form!) : await ServiceLog.CreateAsync(form!);
+        saving = false;
+
+        if (result.Succeeded)
+            Dialog.Close();
+        else
+            error = result.Error;
+    }
+}

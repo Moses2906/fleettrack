@@ -1,0 +1,89 @@
+@inject RenewalService Renewals
+
+<MudDialog>
+    <DialogContent>
+        @if (form is not null)
+        {
+            <EditForm Model="form" OnValidSubmit="SaveAsync" id="renewal-form">
+                <DataAnnotationsValidator />
+                <MudGrid Spacing="3">
+                    @if (IsNew && CurrentExpiry is { } current)
+                    {
+                        <MudItem xs="12">
+                            <MudAlert Severity="Severity.Info" Dense="true" Icon="@Icons.Material.Rounded.Info">
+                                The current disk expires on <b>@current.ToString("dd MMM yyyy")</b>. Saving updates the vehicle to the new expiry date.
+                            </MudAlert>
+                        </MudItem>
+                    }
+                    <MudItem xs="12" sm="6">
+                        <MudDatePicker @bind-Date="form.DatePurchased" For="() => form.DatePurchased" Label="Date purchased" Variant="Variant.Outlined"
+                                       DateFormat="dd MMM yyyy" Editable="true" MaxDate="DateTime.Today" ReadOnly="!IsNew" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudDatePicker @bind-Date="form.NewExpiryDate" For="() => form.NewExpiryDate" Label="New expiry date" Variant="Variant.Outlined"
+                                       DateFormat="dd MMM yyyy" Editable="true" ReadOnly="!IsNew"
+                                       HelperText="@(IsNew ? "As printed on the new disk" : "To change a date, delete this renewal and record it again")" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudNumericField @bind-Value="form.AmountPaid" For="() => form.AmountPaid" Label="Amount paid" Variant="Variant.Outlined"
+                                         Adornment="Adornment.Start" AdornmentText="R" HideSpinButtons="true" Format="0.00" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="form.ReferenceNumber" For="() => form.ReferenceNumber" Label="Reference number" Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="form.ProcessedBy" For="() => form.ProcessedBy" Label="Processed by" Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="form.Notes" For="() => form.Notes" Label="Notes (optional)" Variant="Variant.Outlined"
+                                      Lines="2" Sizing="InputSizing.Auto" MaxLines="6" MaxLength="2000" />
+                    </MudItem>
+                </MudGrid>
+                @if (error is not null)
+                {
+                    <MudAlert Severity="Severity.Error" Class="mt-4" Dense="true">@error</MudAlert>
+                }
+            </EditForm>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => Dialog.Cancel()">Cancel</MudButton>
+        <MudButton ButtonType="ButtonType.Submit" form="renewal-form" Variant="Variant.Filled" Color="Color.Primary" Disabled="saving || form is null">
+            @(IsNew ? "Save renewal" : "Save changes")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+    [Parameter, EditorRequired] public int VehicleId { get; set; }
+    [Parameter] public DateOnly? CurrentExpiry { get; set; }
+
+    /// <summary>Set to edit an existing renewal's amount, reference, processor and notes.</summary>
+    [Parameter] public int? RenewalId { get; set; }
+
+    private bool IsNew => RenewalId is null;
+    private RenewalForm? form;
+    private string? error;
+    private bool saving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        form = RenewalId is { } id ? await Renewals.GetFormAsync(id) : await Renewals.NewFormAsync(VehicleId);
+        if (form is null)
+            error = "This record has been deleted.";
+    }
+
+    private async Task SaveAsync()
+    {
+        saving = true;
+        error = null;
+        var result = RenewalId is { } id ? await Renewals.UpdateDetailsAsync(id, form!) : await Renewals.CreateAsync(VehicleId, form!);
+        saving = false;
+
+        if (result.Succeeded)
+            Dialog.Close();
+        else
+            error = result.Error;
+    }
+}

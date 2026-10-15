@@ -1,0 +1,49 @@
+@inject RenewalService Renewals
+
+<MudDialog>
+    <DialogContent>
+        <EditForm Model="form" OnValidSubmit="SaveAsync" id="step-form">
+            <DataAnnotationsValidator />
+            <MudStack Spacing="3" Style="min-width: min(400px, 80vw)">
+                <MudSelect T="RenewalStepType" @bind-Value="form.StepType" Label="What happened" Variant="Variant.Outlined">
+                    @foreach (var type in Enum.GetValues<RenewalStepType>())
+                    {
+                        <MudSelectItem Value="type">@DisplayNames.Of(type)</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudDatePicker @bind-Date="form.StepDate" For="() => form.StepDate" Label="Date" Variant="Variant.Outlined"
+                               DateFormat="dd MMM yyyy" Editable="true" MaxDate="DateTime.Today" />
+                <MudTextField @bind-Value="form.Notes" For="() => form.Notes" Label="Notes (optional)" Variant="Variant.Outlined"
+                              Placeholder="e.g. Handed to Sipho at the depot" Lines="2" MaxLength="1000" />
+                @if (error is not null)
+                {
+                    <MudAlert Severity="Severity.Error" Dense="true">@error</MudAlert>
+                }
+            </MudStack>
+        </EditForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => Dialog.Cancel()">Cancel</MudButton>
+        <MudButton ButtonType="ButtonType.Submit" form="step-form" Variant="Variant.Filled" Color="Color.Primary" Disabled="saving">Save</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+    [Parameter, EditorRequired] public int RenewalId { get; set; }
+    [Parameter] public RenewalStepType StepType { get; set; } = RenewalStepType.DiskHandedToDriver;
+
+    private readonly RenewalStepForm form = new();
+    private string? error;
+    private bool saving;
+
+    protected override void OnInitialized() => form.StepType = StepType;
+
+    private async Task SaveAsync()
+    {
+        saving = true;
+        var result = await Renewals.AddStepAsync(RenewalId, form);
+        saving = false;
+        if (result.Succeeded) Dialog.Close(); else error = result.Error;
+    }
+}
