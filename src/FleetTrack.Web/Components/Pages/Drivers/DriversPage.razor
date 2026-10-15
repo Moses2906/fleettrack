@@ -1,0 +1,115 @@
+@page "/drivers"
+@attribute [Authorize(Policy = nameof(Permission.ViewRecords))]
+@using FleetTrack.Web.Components.Pages.Lists
+@inject ReferenceDataService ReferenceData
+@inject PermissionService Permissions
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+
+<PageTitle>Drivers · FleetTrack</PageTitle>
+
+<PageHeader Title="Drivers" Subtitle="The people who drive the vehicles, and which vehicle each one has.">
+    <Actions>
+        @if (canEdit)
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.PersonAdd" OnClick="() => EditAsync(null)">Add driver</MudButton>
+        }
+    </Actions>
+</PageHeader>
+
+<MudPaper Outlined="true" Elevation="0">
+    <div class="px-4 pt-4 pb-1">
+        <MudTextField @bind-Value="search" Immediate="true" Clearable="true" Variant="Variant.Outlined" Margin="Margin.Dense"
+                      Placeholder="Search name, phone or registration" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Rounded.Search"
+                      Style="max-width: 420px" />
+    </div>
+    <MudTable Items="drivers" Filter="Matches" Hover="true" Elevation="0" Breakpoint="Breakpoint.Sm" Loading="drivers is null">
+        <HeaderContent>
+            <MudTh>Name</MudTh><MudTh>Phone</MudTh><MudTh>Drives</MudTh><MudTh>Licence no.</MudTh><MudTh></MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Name">
+                <b>@context.FullName</b>
+                @if (!context.IsActive)
+                {
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Class="ml-1">Inactive</MudChip>
+                }
+                @if (context.Email is not null)
+                {
+                    <MudText Typo="Typo.caption" Class="d-block mud-text-secondary">@context.Email</MudText>
+                }
+            </MudTd>
+            <MudTd DataLabel="Phone">
+                @if (context.Phone is null)
+                {
+                    <span class="mud-text-disabled">—</span>
+                }
+                else
+                {
+                    <MudLink Href="@($"tel:{context.Phone.Replace(" ", "")}")">@context.Phone</MudLink>
+                }
+            </MudTd>
+            <MudTd DataLabel="Drives">
+                @if (context.Vehicles.Count == 0)
+                {
+                    <span class="mud-text-disabled">No vehicle</span>
+                }
+                @foreach (var registration in context.Vehicles)
+                {
+                    <span class="ft-reg mr-2">@registration</span>
+                }
+            </MudTd>
+            <MudTd DataLabel="Licence no.">@(context.DriverLicenceNumber ?? "—")</MudTd>
+            <MudTd Style="text-align: right; white-space: nowrap">
+                <RowActions CanEdit="canEdit" CanDelete="canDelete" OnEdit="() => EditAsync(context.Id)" OnDelete="() => DeleteAsync(context)" />
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <EmptyState Icon="@Icons.Material.Rounded.Badge" Title="No drivers found"
+                        Message="@(drivers is { Count: 0 } ? "Add the people who drive your vehicles, then assign them on each vehicle." : "Try a different search.")" />
+        </NoRecordsContent>
+    </MudTable>
+</MudPaper>
+
+@code {
+    private List<DriverRow>? drivers;
+    private string search = "";
+    private bool canEdit, canDelete;
+
+    protected override async Task OnInitializedAsync()
+    {
+        canEdit = await Permissions.HasAsync(Permission.EditRecords);
+        canDelete = await Permissions.HasAsync(Permission.DeleteRecords);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync() => drivers = await ReferenceData.ListDriversAsync();
+
+    private bool Matches(DriverRow d) =>
+        string.IsNullOrWhiteSpace(search)
+        || d.FullName.Contains(search, StringComparison.OrdinalIgnoreCase)
+        || (d.Phone?.Replace(" ", "").Contains(search.Replace(" ", "")) ?? false)
+        || d.Vehicles.Any(r => RegistrationNumbers.ToKey(r).Contains(RegistrationNumbers.ToKey(search)) && RegistrationNumbers.ToKey(search).Length > 0);
+
+    private async Task EditAsync(int? id)
+    {
+        var dialog = await Dialogs.ShowAsync<DriverDialog>(id is null ? "Add driver" : "Edit driver",
+            new DialogParameters<DriverDialog> { { d => d.DriverId, id } });
+        if ((await dialog.Result) is { Canceled: false })
+        {
+            Snackbar.Add("Driver saved.", Severity.Success);
+            await LoadAsync();
+        }
+    }
+
+    private async Task DeleteAsync(DriverRow driver)
+    {
+        var extra = driver.VehicleCount > 0 ? $" They will be unassigned from {string.Join(", ", driver.Vehicles)}." : "";
+        var confirmed = await Dialogs.ShowMessageBoxAsync("Delete driver", $"Permanently delete {driver.FullName}?{extra}", yesText: "Delete", cancelText: "Cancel");
+        if (confirmed != true)
+            return;
+        var result = await ReferenceData.DeleteDriverAsync(driver.Id);
+        Snackbar.Add(result.Succeeded ? $"{driver.FullName} deleted." : result.Error ?? "Couldn't delete.", result.Succeeded ? Severity.Success : Severity.Error);
+        await LoadAsync();
+    }
+}

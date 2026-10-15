@@ -1,48 +1,16 @@
-@page "/lists"
-@attribute [Authorize(Policy = nameof(Permission.ViewRecords))]
+@page "/admin/licence-holders"
+@attribute [Authorize(Policy = nameof(Permission.EditRecords))]
 @inject ReferenceDataService ReferenceData
 @inject PermissionService Permissions
 @inject IDialogService Dialogs
 @inject ISnackbar Snackbar
 
-<PageTitle>Drivers & owners · FleetTrack</PageTitle>
+<PageTitle>Licence holders & categories · FleetTrack</PageTitle>
 
-<PageHeader Title="Drivers & owners" Subtitle="The people and companies vehicles are assigned and licensed to, and the vehicle categories." />
+<PageHeader Title="Licence holders & categories" Subtitle="Who vehicles are registered to (as on the licence disk), and the vehicle types used for filtering." />
 
 <MudPaper Outlined="true" Elevation="0">
     <MudTabs Elevation="0" ApplyEffectsToContainer="true" @bind-ActivePanelIndex="tab">
-        <MudTabPanel Text="Drivers" Icon="@Icons.Material.Rounded.Badge">
-            <div class="d-flex justify-end pa-3 pb-0">
-                @if (canEdit)
-                {
-                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.Add" OnClick="() => EditDriverAsync(null)">Add driver</MudButton>
-                }
-            </div>
-            <MudTable Items="drivers" Hover="true" Elevation="0" Breakpoint="Breakpoint.Sm" Loading="drivers is null">
-                <HeaderContent>
-                    <MudTh>Name</MudTh><MudTh>Phone</MudTh><MudTh>Email</MudTh><MudTh>Licence no.</MudTh><MudTh>Vehicles</MudTh><MudTh></MudTh>
-                </HeaderContent>
-                <RowTemplate>
-                    <MudTd DataLabel="Name">
-                        @context.FullName
-                        @if (!context.IsActive)
-                        {
-                            <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Class="ml-1">Inactive</MudChip>
-                        }
-                    </MudTd>
-                    <MudTd DataLabel="Phone">@(context.Phone ?? "—")</MudTd>
-                    <MudTd DataLabel="Email">@(context.Email ?? "—")</MudTd>
-                    <MudTd DataLabel="Licence no.">@(context.DriverLicenceNumber ?? "—")</MudTd>
-                    <MudTd DataLabel="Vehicles">@context.VehicleCount</MudTd>
-                    <MudTd Style="text-align: right">
-                        <RowActions CanEdit="canEdit" CanDelete="canDelete" OnEdit="() => EditDriverAsync(context.Id)"
-                                    OnDelete="() => DeleteDriverAsync(context)" />
-                    </MudTd>
-                </RowTemplate>
-                <NoRecordsContent><EmptyState Icon="@Icons.Material.Rounded.Badge" Title="No drivers yet" /></NoRecordsContent>
-            </MudTable>
-        </MudTabPanel>
-
         <MudTabPanel Text="Licence holders" Icon="@Icons.Material.Rounded.Business">
             <div class="d-flex justify-end pa-3 pb-0">
                 @if (canEdit)
@@ -101,7 +69,6 @@
 
 @code {
     private int tab;
-    private List<DriverRow>? drivers;
     private List<LicenceHolderRow>? holders;
     private List<CategoryRow>? categories;
     private bool canEdit;
@@ -116,16 +83,8 @@
 
     private async Task LoadAsync()
     {
-        drivers = await ReferenceData.ListDriversAsync();
         holders = await ReferenceData.ListLicenceHoldersAsync();
         categories = await ReferenceData.ListCategoriesAsync();
-    }
-
-    private async Task EditDriverAsync(int? id)
-    {
-        var dialog = await Dialogs.ShowAsync<DriverDialog>(id is null ? "Add driver" : "Edit driver",
-            new DialogParameters<DriverDialog> { { d => d.DriverId, id } });
-        await AfterDialogAsync(dialog, "Driver saved.");
     }
 
     private async Task EditHolderAsync(int? id)
@@ -150,10 +109,6 @@
             await LoadAsync();
         }
     }
-
-    private Task DeleteDriverAsync(DriverRow d) =>
-        DeleteAsync(d.FullName, () => ReferenceData.DeleteDriverAsync(d.Id),
-            d.VehicleCount > 0 ? $" They will be unassigned from {d.VehicleCount} vehicle(s)." : "");
 
     private Task DeleteHolderAsync(LicenceHolderRow h) =>
         DeleteAsync(h.Name, () => ReferenceData.DeleteLicenceHolderAsync(h.Id), "");

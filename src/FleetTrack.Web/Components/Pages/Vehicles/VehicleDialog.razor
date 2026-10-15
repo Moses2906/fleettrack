@@ -1,5 +1,6 @@
 @inject VehicleService Vehicles
 @inject ReferenceDataService ReferenceData
+@inject IDialogService Dialogs
 
 <MudDialog>
     <DialogContent>
@@ -42,21 +43,30 @@
                         <MudTextField @bind-Value="form.Vin" For="() => form.Vin" Label="VIN (optional)" Variant="Variant.Outlined" Style="text-transform: uppercase" />
                     </MudItem>
                     <MudItem xs="12" sm="6">
-                        <MudSelect T="int?" @bind-Value="form.LicenceHolderId" For="() => form.LicenceHolderId" Label="Licensed to" Variant="Variant.Outlined"
-                                   HelperText="Missing? Add it under Lists → Licence holders.">
-                            @foreach (var h in holders)
-                            {
-                                <MudSelectItem T="int?" Value="h.Id">@h.Label</MudSelectItem>
-                            }
-                        </MudSelect>
+                        <div class="d-flex align-start gap-1">
+                            <MudSelect T="int?" @bind-Value="form.LicenceHolderId" For="() => form.LicenceHolderId" Label="Licensed to" Variant="Variant.Outlined">
+                                @foreach (var h in holders)
+                                {
+                                    <MudSelectItem T="int?" Value="h.Id">@h.Label</MudSelectItem>
+                                }
+                            </MudSelect>
+                            <MudTooltip Text="New licence holder">
+                                <MudIconButton Icon="@Icons.Material.Rounded.AddCircleOutline" OnClick="NewHolderAsync" Class="mt-2" aria-label="New licence holder" />
+                            </MudTooltip>
+                        </div>
                     </MudItem>
                     <MudItem xs="12" sm="6">
-                        <MudSelect T="int?" @bind-Value="form.CurrentDriverId" Label="Current driver" Variant="Variant.Outlined" Clearable="true">
-                            @foreach (var d in drivers.Where(d => d.IsActive || d.Id == form.CurrentDriverId))
-                            {
-                                <MudSelectItem T="int?" Value="d.Id">@d.Label</MudSelectItem>
-                            }
-                        </MudSelect>
+                        <div class="d-flex align-start gap-1">
+                            <MudSelect T="int?" @bind-Value="form.CurrentDriverId" Label="Current driver" Variant="Variant.Outlined" Clearable="true">
+                                @foreach (var d in drivers.Where(d => d.IsActive || d.Id == form.CurrentDriverId))
+                                {
+                                    <MudSelectItem T="int?" Value="d.Id">@d.Label</MudSelectItem>
+                                }
+                            </MudSelect>
+                            <MudTooltip Text="New driver">
+                                <MudIconButton Icon="@Icons.Material.Rounded.PersonAddAlt" OnClick="NewDriverAsync" Class="mt-2" aria-label="New driver" />
+                            </MudTooltip>
+                        </div>
                     </MudItem>
                     <MudItem xs="12">
                         <MudText Typo="Typo.subtitle2" Class="mb-1">Documents we have</MudText>
@@ -111,6 +121,27 @@
             : new VehicleForm { LicenceExpiryDate = DateTime.Today.AddYears(1) };
         if (form is null)
             error = "This vehicle has been deleted.";
+    }
+
+    // Add a licence holder or driver without leaving the vehicle form; the new one is selected straight away.
+    private async Task NewHolderAsync()
+    {
+        var dialog = await Dialogs.ShowAsync<FleetTrack.Web.Components.Pages.Lists.LicenceHolderDialog>("New licence holder");
+        if ((await dialog.Result) is { Canceled: false, Data: int id })
+        {
+            holders = await ReferenceData.LicenceHolderOptionsAsync();
+            form!.LicenceHolderId = id;
+        }
+    }
+
+    private async Task NewDriverAsync()
+    {
+        var dialog = await Dialogs.ShowAsync<FleetTrack.Web.Components.Pages.Lists.DriverDialog>("New driver");
+        if ((await dialog.Result) is { Canceled: false, Data: int id })
+        {
+            drivers = await ReferenceData.DriverOptionsAsync();
+            form!.CurrentDriverId = id;
+        }
     }
 
     private async Task SaveAsync()

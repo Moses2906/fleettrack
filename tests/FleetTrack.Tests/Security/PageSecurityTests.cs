@@ -50,6 +50,8 @@ public class PageSecurityTests
     [InlineData("/admin/users", "ManageUsers")]
     [InlineData("/admin/audit-log", "ViewAuditLog")]
     [InlineData("/documents", "ViewDocuments")]
+    [InlineData("/admin/licence-holders", "EditRecords")]
+    [InlineData("/admin/reminders", "ManageUsers")]
     public void AdminAndDocumentPages_RequireTheRightPermission(string route, string policy)
     {
         var page = Pages().Single(p => p.Route == route).Type;

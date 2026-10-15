@@ -7,11 +7,12 @@
     <AuthorizeView Policy="@nameof(Permission.ViewDocuments)">
         <MudNavLink Href="documents" Icon="@Icons.Material.Rounded.Description">Documents</MudNavLink>
     </AuthorizeView>
-    <MudNavLink Href="lists" Icon="@Icons.Material.Rounded.ListAlt">Drivers & owners</MudNavLink>
+    <MudNavLink Href="drivers" Icon="@Icons.Material.Rounded.Badge">Drivers</MudNavLink>
 
     @* Admin-only links are hidden here for tidiness, but the pages and services check permissions themselves. *@
     <AuthorizeView Policy="@nameof(Permission.ManageUsers)">
         <MudText Typo="Typo.overline" Class="px-4 mt-6 mb-1 mud-text-secondary">Administration</MudText>
+        <MudNavLink Href="admin/licence-holders" Icon="@Icons.Material.Rounded.Business">Licence holders</MudNavLink>
         <MudNavLink Href="admin/users" Icon="@Icons.Material.Rounded.ManageAccounts">Users</MudNavLink>
         <MudNavLink Href="admin/reminders" Icon="@Icons.Material.Rounded.MarkEmailUnread">Reminder emails</MudNavLink>
     </AuthorizeView>

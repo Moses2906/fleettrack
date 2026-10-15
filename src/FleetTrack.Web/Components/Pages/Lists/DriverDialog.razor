@@ -42,6 +42,6 @@
         saving = true;
         var result = await ReferenceData.SaveDriverAsync(DriverId, form!);
         saving = false;
-        if (result.Succeeded) Dialog.Close(); else error = result.Error;
+        if (result.Succeeded) Dialog.Close(DialogResult.Ok(result.Id)); else error = result.Error;
     }
 }

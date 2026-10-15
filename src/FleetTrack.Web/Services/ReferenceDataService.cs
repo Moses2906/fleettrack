@@ -8,7 +8,10 @@ using Microsoft.EntityFrameworkCore;
 namespace FleetTrack.Web.Services;
 
 public record CategoryRow(int Id, string Name, string? Description, bool IsActive, int SortOrder, int VehicleCount);
-public record DriverRow(int Id, string FullName, string? Phone, string? Email, string? DriverLicenceNumber, bool IsActive, int VehicleCount);
+public record DriverRow(int Id, string FullName, string? Phone, string? Email, string? DriverLicenceNumber, bool IsActive, IReadOnlyList<string> Vehicles)
+{
+    public int VehicleCount => Vehicles.Count;
+}
 public record LicenceHolderRow(int Id, HolderType HolderType, string Name, string IdentifierMasked, int VehicleCount);
 public record Option(int Id, string Label, bool IsActive = true);
 
@@ -99,7 +102,8 @@ public class ReferenceDataService(IDbContextFactory<ApplicationDbContext> dbFact
         await permissions.DemandAsync(Permission.ViewRecords);
         await using var db = await dbFactory.CreateDbContextAsync();
         return await db.Drivers.AsNoTracking().OrderBy(d => d.FullName)
-            .Select(d => new DriverRow(d.Id, d.FullName, d.Phone, d.Email, d.DriverLicenceNumber, d.IsActive, d.AssignedVehicles.Count))
+            .Select(d => new DriverRow(d.Id, d.FullName, d.Phone, d.Email, d.DriverLicenceNumber, d.IsActive,
+                d.AssignedVehicles.OrderBy(v => v.RegistrationNumber).Select(v => v.RegistrationNumber).ToList()))
             .ToListAsync();
     }
 
