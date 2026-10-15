@@ -1,3 +1,4 @@
+using System.Globalization;
 using FleetTrack.Core.Entities;
 
 namespace FleetTrack.Core.Rules;
@@ -41,12 +42,16 @@ public static class ServiceRules
     {
         var earlier = otherServices.Where(s => s.ServiceDate <= serviceDate).MaxBy(s => s.OdometerKm);
         if (earlier is not null && odometerKm < earlier.OdometerKm)
-            return $"The odometer reading is lower than the {earlier.OdometerKm:N0} km recorded on {earlier.ServiceDate:dd MMM yyyy}. Please check it.";
+            return $"The odometer reading is lower than the {Km(earlier.OdometerKm)} recorded on {Date(earlier.ServiceDate)}. Please check it.";
 
         var later = otherServices.Where(s => s.ServiceDate > serviceDate).MinBy(s => s.OdometerKm);
         if (later is not null && odometerKm > later.OdometerKm)
-            return $"The odometer reading is higher than the {later.OdometerKm:N0} km recorded later, on {later.ServiceDate:dd MMM yyyy}. Please check it.";
+            return $"The odometer reading is higher than the {Km(later.OdometerKm)} recorded later, on {Date(later.ServiceDate)}. Please check it.";
 
         return null;
     }
+
+    // Fixed (invariant) formats, so messages read the same whatever the server's regional settings are.
+    private static string Km(int km) => km.ToString("#,##0", CultureInfo.InvariantCulture) + " km";
+    private static string Date(DateOnly date) => date.ToString("dd MMM yyyy", CultureInfo.InvariantCulture);
 }

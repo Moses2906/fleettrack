@@ -116,3 +116,93 @@ public class CategoryForm
     [Range(0, 999)]
     public int SortOrder { get; set; }
 }
+
+public class ServiceForm : IValidatableObject
+{
+    [Required(ErrorMessage = "Choose the vehicle.")]
+    public int? VehicleId { get; set; }
+
+    [Required(ErrorMessage = "Enter the date of the service.")]
+    public DateTime? ServiceDate { get; set; }
+
+    [Required(ErrorMessage = "Enter the odometer reading."), Range(0, 3_000_000, ErrorMessage = "Enter a reading between 0 and 3 000 000 km.")]
+    public int? OdometerKm { get; set; }
+
+    public WorkType WorkType { get; set; } = WorkType.RoutineService;
+
+    [Required(ErrorMessage = "Describe the work done."), StringLength(250)]
+    public string Description { get; set; } = "";
+
+    [Required(ErrorMessage = "Enter the workshop or supplier."), StringLength(100)]
+    public string Workshop { get; set; } = "";
+
+    [Required(ErrorMessage = "Enter the cost (0 if it was free)."), Range(0, 10_000_000, ErrorMessage = "Enter a cost between R0 and R10 000 000.")]
+    public decimal? Cost { get; set; }
+
+    [StringLength(2000)]
+    public string? Notes { get; set; }
+
+    public DateTime? NextServiceDueDate { get; set; }
+
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (ServiceDate > DateTime.Today)
+            yield return new ValidationResult("The service date can't be in the future.", [nameof(ServiceDate)]);
+        if (NextServiceDueDate is not null && ServiceDate is not null && NextServiceDueDate <= ServiceDate)
+            yield return new ValidationResult("The next service must be after this one.", [nameof(NextServiceDueDate)]);
+    }
+}
+
+public class RenewalForm
+{
+    [Required(ErrorMessage = "Enter the date the disk was bought.")]
+    public DateTime? DatePurchased { get; set; }
+
+    [Required(ErrorMessage = "Enter the new expiry date printed on the disk.")]
+    public DateTime? NewExpiryDate { get; set; }
+
+    [Required(ErrorMessage = "Enter the amount paid."), Range(0, 1_000_000, ErrorMessage = "Enter an amount between R0 and R1 000 000.")]
+    public decimal? AmountPaid { get; set; }
+
+    [StringLength(50)]
+    public string? ReferenceNumber { get; set; }
+
+    [Required(ErrorMessage = "Enter who processed the renewal."), StringLength(100)]
+    public string ProcessedBy { get; set; } = "";
+
+    [StringLength(2000)]
+    public string? Notes { get; set; }
+}
+
+public class RenewalStepForm
+{
+    public RenewalStepType StepType { get; set; } = RenewalStepType.DiskHandedToDriver;
+
+    [Required(ErrorMessage = "Enter the date.")]
+    public DateTime? StepDate { get; set; } = DateTime.Today;
+
+    [StringLength(1000)]
+    public string? Notes { get; set; }
+}
+
+public static class DisplayNames
+{
+    public static string Of(WorkType type) => type switch
+    {
+        WorkType.RoutineService => "Routine service",
+        WorkType.Roadworthy => "Roadworthy test",
+        _ => type.ToString(),
+    };
+
+    public static string Of(RenewalStepType type) => type switch
+    {
+        RenewalStepType.DiskHandedToDriver => "Disk handed to driver",
+        RenewalStepType.DiskFittedToVehicle => "Disk fitted to vehicle",
+        RenewalStepType.CopyFiled => "Copy filed",
+        _ => "Other",
+    };
+
+    /// <summary>Rand amounts, e.g. "R 2,400.00". Fixed format so it looks the same on every server.</summary>
+    public static string Money(decimal amount) =>
+        "R " + amount.ToString("#,##0.00", System.Globalization.CultureInfo.InvariantCulture);
+}

@@ -1,3 +1,4 @@
+using System.Globalization;
 using FleetTrack.Core.Rules;
 using FleetTrack.Web.Components;
 using FleetTrack.Web.Components.Account;
@@ -13,6 +14,10 @@ using MudBlazor.Services;
 using Oracle.EntityFrameworkCore.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Dates and numbers look the same on every server, whatever its regional settings:
+// "15 Oct 2026", and a decimal point (not a comma) when typing amounts like 2400.50.
+CultureInfo.DefaultThreadCurrentCulture = CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.GetCultureInfo("en-GB");
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
@@ -116,6 +121,8 @@ builder.Services.AddScoped<AuditService>();
 builder.Services.AddScoped<UserAdminService>();
 builder.Services.AddScoped<VehicleService>();
 builder.Services.AddScoped<ReferenceDataService>();
+builder.Services.AddScoped<ServiceLogService>();
+builder.Services.AddScoped<RenewalService>();
 
 // Uploaded documents are stored outside wwwroot (see DocumentStorageOptions).
 var storageOptions = builder.Configuration.GetSection("Storage").Get<DocumentStorageOptions>() ?? new DocumentStorageOptions();
