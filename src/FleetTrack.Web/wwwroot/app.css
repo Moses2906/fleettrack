@@ -225,21 +225,13 @@ h1:focus {
     background-color: var(--mud-palette-action-default-hover);
 }
 
-/* Renewal follow-up timeline */
-.ft-steps {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    border-left: 2px solid var(--mud-palette-lines-default);
-    padding-left: 12px;
-    margin-left: 8px;
+/* Follow-up steps in the renewal form */
+.ft-step-row {
+    min-height: 44px;
 }
 
-.ft-step {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-height: 32px;
+.ft-step-check {
+    min-width: 210px;
 }
 
 /* History timeline: hug the left edge instead of MudBlazor's default indent */

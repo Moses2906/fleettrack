@@ -77,7 +77,8 @@ public class RenewalService(
     /// Records a renewal and, in the same save, moves the vehicle's expiry date forward.
     /// Both changes are written in one transaction, so they can never get out of step.
     /// </summary>
-    public async Task<OperationResult> CreateAsync(int vehicleId, RenewalForm form)
+    /// <param name="stepsDone">Follow-up steps already done (handed over, fitted, filed), saved with the renewal.</param>
+    public async Task<OperationResult> CreateAsync(int vehicleId, RenewalForm form, IReadOnlyList<RenewalStepForm>? stepsDone = null)
     {
         await permissions.DemandAsync(Permission.EditRecords);
         if (FormValidator.Validate(form) is { } error)
@@ -105,6 +106,17 @@ public class RenewalService(
             CreatedAtUtc = DateTime.UtcNow,
             CreatedBy = (await currentUser.GetActorAsync()).UserName ?? "unknown",
         };
+        var recordedBy = renewal.CreatedBy;
+        foreach (var step in stepsDone ?? [])
+        {
+            if (FormValidator.Validate(step) is { } stepError)
+                return OperationResult.Fail(stepError);
+            var stepDate = DateOnly.FromDateTime(step.StepDate!.Value);
+            if (stepDate > Today || stepDate < purchased)
+                return OperationResult.Fail($"\"{DisplayNames.Of(step.StepType)}\" must be dated between the purchase date and today.");
+            renewal.Steps.Add(new RenewalStep { StepType = step.StepType, StepDate = stepDate, Notes = Blank(step.Notes), RecordedBy = recordedBy });
+        }
+
         RenewalRules.Apply(vehicle, renewal);
         db.LicenceRenewals.Add(renewal);
         await db.SaveChangesAsync();

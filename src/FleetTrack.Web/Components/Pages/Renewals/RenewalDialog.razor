@@ -1,48 +1,78 @@
 @inject RenewalService Renewals
 
+@* Records a disk renewal in one go: the new disk, the payment, and what has already happened since. *@
 <MudDialog>
     <DialogContent>
         @if (form is not null)
         {
             <EditForm Model="form" OnValidSubmit="SaveAsync" id="renewal-form">
                 <DataAnnotationsValidator />
-                <MudGrid Spacing="3">
+                <MudStack Spacing="4">
                     @if (IsNew && CurrentExpiry is { } current)
                     {
-                        <MudItem xs="12">
-                            <MudAlert Severity="Severity.Info" Dense="true" Icon="@Icons.Material.Rounded.Info">
-                                The current disk expires on <b>@current.ToString("dd MMM yyyy")</b>. Saving updates the vehicle to the new expiry date.
-                            </MudAlert>
-                        </MudItem>
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary">
+                            The current disk expires on <b>@current.ToString("dd MMM yyyy")</b>. Saving updates the vehicle to the new expiry date.
+                        </MudText>
                     }
-                    <MudItem xs="12" sm="6">
-                        <MudDatePicker @bind-Date="form.DatePurchased" For="() => form.DatePurchased" Label="Date purchased" Variant="Variant.Outlined"
-                                       DateFormat="dd MMM yyyy" Editable="true" MaxDate="DateTime.Today" ReadOnly="!IsNew" />
-                    </MudItem>
-                    <MudItem xs="12" sm="6">
-                        <MudDatePicker @bind-Date="form.NewExpiryDate" For="() => form.NewExpiryDate" Label="New expiry date" Variant="Variant.Outlined"
-                                       DateFormat="dd MMM yyyy" Editable="true" ReadOnly="!IsNew"
-                                       HelperText="@(IsNew ? "As printed on the new disk" : "To change a date, delete this renewal and record it again")" />
-                    </MudItem>
-                    <MudItem xs="12" sm="6">
-                        <MudNumericField @bind-Value="form.AmountPaid" For="() => form.AmountPaid" Label="Amount paid" Variant="Variant.Outlined"
-                                         Adornment="Adornment.Start" AdornmentText="R" HideSpinButtons="true" Format="0.00" />
-                    </MudItem>
-                    <MudItem xs="12" sm="6">
-                        <MudTextField @bind-Value="form.ReferenceNumber" For="() => form.ReferenceNumber" Label="Reference number" Variant="Variant.Outlined" />
-                    </MudItem>
-                    <MudItem xs="12">
-                        <MudTextField @bind-Value="form.ProcessedBy" For="() => form.ProcessedBy" Label="Processed by" Variant="Variant.Outlined" />
-                    </MudItem>
-                    <MudItem xs="12">
-                        <MudTextField @bind-Value="form.Notes" For="() => form.Notes" Label="Notes (optional)" Variant="Variant.Outlined"
-                                      Lines="2" Sizing="InputSizing.Auto" MaxLines="6" MaxLength="2000" />
-                    </MudItem>
-                </MudGrid>
-                @if (error is not null)
-                {
-                    <MudAlert Severity="Severity.Error" Class="mt-4" Dense="true">@error</MudAlert>
-                }
+
+                    <section>
+                        <MudText Typo="Typo.subtitle2" Class="ft-section-title">The new disk</MudText>
+                        <MudGrid Spacing="2">
+                            <MudItem xs="12" sm="6">
+                                <MudDatePicker @bind-Date="form.DatePurchased" For="() => form.DatePurchased" Label="Bought on" Variant="Variant.Outlined"
+                                               DateFormat="dd MMM yyyy" Editable="true" MaxDate="DateTime.Today" ReadOnly="!IsNew" />
+                            </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudDatePicker @bind-Date="form.NewExpiryDate" For="() => form.NewExpiryDate" Label="Valid until" Variant="Variant.Outlined"
+                                               DateFormat="dd MMM yyyy" Editable="true" ReadOnly="!IsNew"
+                                               HelperText="@(IsNew ? "As printed on the disk" : "To change a date, delete and record again")" />
+                            </MudItem>
+                        </MudGrid>
+                    </section>
+
+                    <section>
+                        <MudText Typo="Typo.subtitle2" Class="ft-section-title">Payment</MudText>
+                        <MudGrid Spacing="2">
+                            <MudItem xs="6">
+                                <MudNumericField @bind-Value="form.AmountPaid" For="() => form.AmountPaid" Label="Amount paid" Variant="Variant.Outlined"
+                                                 Adornment="Adornment.Start" AdornmentText="R" HideSpinButtons="true" Format="0.00" />
+                            </MudItem>
+                            <MudItem xs="6">
+                                <MudTextField @bind-Value="form.ReferenceNumber" For="() => form.ReferenceNumber" Label="Reference (optional)" Variant="Variant.Outlined" />
+                            </MudItem>
+                            <MudItem xs="12">
+                                <MudTextField @bind-Value="form.ProcessedBy" For="() => form.ProcessedBy" Label="Processed by" Variant="Variant.Outlined" />
+                            </MudItem>
+                        </MudGrid>
+                    </section>
+
+                    @if (IsNew)
+                    {
+                        <section>
+                            <MudText Typo="Typo.subtitle2" Class="ft-section-title">After buying the disk</MudText>
+                            <MudText Typo="Typo.caption" Class="mud-text-secondary d-block mb-1">Tick what has already happened. You can tick the rest later on the Renewals page.</MudText>
+                            @foreach (var step in steps)
+                            {
+                                <div class="d-flex align-center flex-wrap gap-2 ft-step-row">
+                                    <MudCheckBox @bind-Value="step.Done" Color="Color.Primary" Label="@DisplayNames.Of(step.Type)" Class="ft-step-check" />
+                                    @if (step.Done)
+                                    {
+                                        <MudDatePicker @bind-Date="step.Date" Variant="Variant.Outlined" Margin="Margin.Dense" DateFormat="dd MMM yyyy"
+                                                       Editable="true" MaxDate="DateTime.Today" Style="max-width: 170px" aria-label="@($"Date: {DisplayNames.Of(step.Type)}")" />
+                                    }
+                                </div>
+                            }
+                        </section>
+                    }
+
+                    <MudTextField @bind-Value="form.Notes" For="() => form.Notes" Label="Notes (optional)" Variant="Variant.Outlined"
+                                  Lines="2" Sizing="InputSizing.Auto" MaxLines="6" MaxLength="2000" />
+
+                    @if (error is not null)
+                    {
+                        <MudAlert Severity="Severity.Error" Dense="true">@error</MudAlert>
+                    }
+                </MudStack>
             </EditForm>
         }
     </DialogContent>
@@ -62,6 +92,20 @@
     /// <summary>Set to edit an existing renewal's amount, reference, processor and notes.</summary>
     [Parameter] public int? RenewalId { get; set; }
 
+    private sealed class StepChoice(RenewalStepType type)
+    {
+        public RenewalStepType Type { get; } = type;
+        public bool Done { get; set; }
+        public DateTime? Date { get; set; } = DateTime.Today;
+    }
+
+    private readonly List<StepChoice> steps =
+    [
+        new(RenewalStepType.DiskHandedToDriver),
+        new(RenewalStepType.DiskFittedToVehicle),
+        new(RenewalStepType.CopyFiled),
+    ];
+
     private bool IsNew => RenewalId is null;
     private RenewalForm? form;
     private string? error;
@@ -78,7 +122,12 @@
     {
         saving = true;
         error = null;
-        var result = RenewalId is { } id ? await Renewals.UpdateDetailsAsync(id, form!) : await Renewals.CreateAsync(VehicleId, form!);
+        var done = steps.Where(s => s.Done)
+            .Select(s => new RenewalStepForm { StepType = s.Type, StepDate = s.Date })
+            .ToList();
+        var result = RenewalId is { } id
+            ? await Renewals.UpdateDetailsAsync(id, form!)
+            : await Renewals.CreateAsync(VehicleId, form!, done);
         saving = false;
 
         if (result.Succeeded)

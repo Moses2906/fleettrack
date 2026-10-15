@@ -138,6 +138,40 @@ public class ServiceAndRenewalServiceTests
         Assert.Equal(new DateOnly(2026, 10, 31), await ExpiryOfAsync(app, vehicleId));
     }
 
+    [Fact]
+    public async Task ARenewal_CanRecordItsFollowUpStepsInOneGo()
+    {
+        await using var app = await TestServices.CreateAsync(Roles.Admin);
+        var vehicleId = await AddVehicleAsync(app, expiry: new DateOnly(2026, 10, 31));
+        var today = Today.ToDateTime(TimeOnly.MinValue);
+
+        var result = await app.Get<RenewalService>().CreateAsync(vehicleId, Renewal(new DateOnly(2027, 10, 31)),
+        [
+            new RenewalStepForm { StepType = RenewalStepType.DiskHandedToDriver, StepDate = today },
+            new RenewalStepForm { StepType = RenewalStepType.DiskFittedToVehicle, StepDate = today },
+        ]);
+
+        Assert.True(result.Succeeded, result.Error);
+        var row = (await app.Get<RenewalService>().ListAsync(vehicleId)).Single();
+        Assert.Equal(2, row.Steps.Count);
+        Assert.Equal([RenewalStepType.CopyFiled], row.OutstandingSteps);
+        Assert.Equal(new DateOnly(2027, 10, 31), await ExpiryOfAsync(app, vehicleId));
+    }
+
+    [Fact]
+    public async Task AStepDatedBeforeThePurchase_StopsTheWholeRenewalFromSaving()
+    {
+        await using var app = await TestServices.CreateAsync(Roles.Admin);
+        var vehicleId = await AddVehicleAsync(app, expiry: new DateOnly(2026, 10, 31));
+
+        var result = await app.Get<RenewalService>().CreateAsync(vehicleId, Renewal(new DateOnly(2027, 10, 31)),
+            [new RenewalStepForm { StepType = RenewalStepType.CopyFiled, StepDate = Today.AddDays(-30).ToDateTime(TimeOnly.MinValue) }]);
+
+        Assert.False(result.Succeeded);
+        Assert.Empty(await app.Get<RenewalService>().ListAsync(vehicleId));
+        Assert.Equal(new DateOnly(2026, 10, 31), await ExpiryOfAsync(app, vehicleId)); // unchanged
+    }
+
     // ----- Services -----
 
     [Fact]
