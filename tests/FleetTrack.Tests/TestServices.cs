@@ -59,6 +59,15 @@ internal sealed class TestServices : IAsyncDisposable
         var storagePath = shareWith?.StoragePath ?? Path.Combine(Path.GetTempPath(), "fleettrack-tests", Guid.NewGuid().ToString("N"));
         services.AddSingleton<IDocumentStorage>(new LocalDocumentStorage(storagePath));
         services.AddScoped<DocumentService>();
+        services.Configure<FleetTrack.Web.Reminders.EmailOptions>(o =>
+        {
+            o.Host = "smtp.test";
+            o.FromAddress = "fleettrack@test";
+            o.AppBaseUrl = "https://fleettrack.test";
+        });
+        services.AddSingleton<FakeMailSender>();
+        services.AddSingleton<FleetTrack.Web.Reminders.IMailSender>(sp => sp.GetRequiredService<FakeMailSender>());
+        services.AddScoped<FleetTrack.Web.Reminders.ReminderService>();
 
         var result = new TestServices(services.BuildServiceProvider(), storagePath, databaseName, ownsStorage: shareWith is null);
         await using var db = await result.CreateDbAsync();
@@ -99,5 +108,20 @@ internal sealed class TestServices : IAsyncDisposable
     {
         // Midday in South Africa is 10:00 UTC.
         public override DateTimeOffset GetUtcNow() => new(today.ToDateTime(new TimeOnly(10, 0)), TimeSpan.Zero);
+    }
+}
+
+/// <summary>Records emails instead of sending them.</summary>
+internal sealed class FakeMailSender : FleetTrack.Web.Reminders.IMailSender
+{
+    public List<FleetTrack.Web.Reminders.EmailMessage> Sent { get; } = [];
+    public bool Fail { get; set; }
+
+    public Task SendAsync(FleetTrack.Web.Reminders.EmailMessage message, CancellationToken cancellationToken = default)
+    {
+        if (Fail)
+            throw new InvalidOperationException("Mail server unavailable");
+        Sent.Add(message);
+        return Task.CompletedTask;
     }
 }

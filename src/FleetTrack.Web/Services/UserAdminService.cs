@@ -10,9 +10,9 @@ using Microsoft.EntityFrameworkCore;
 namespace FleetTrack.Web.Services;
 
 public record UserSummary(
-    string Id, string FullName, string Email, string Role, bool IsActive, bool IsLockedOut, bool TwoFactorEnabled);
+    string Id, string FullName, string Email, string Role, bool IsActive, bool IsLockedOut, bool TwoFactorEnabled, bool ReceivesReminderEmails);
 
-public record UserForm(string FullName, string Email, string Role, string? Password);
+public record UserForm(string FullName, string Email, string Role, string? Password, bool ReceivesReminderEmails = false);
 
 /// <summary>
 /// Creating, editing, disabling and deleting user accounts. Admin only.
@@ -44,7 +44,8 @@ public class UserAdminService(
             admins.Contains(u.Id) ? Roles.Admin : Roles.Staff,
             u.IsActive,
             u.LockoutEnd > now,
-            u.TwoFactorEnabled)).ToList();
+            u.TwoFactorEnabled,
+            u.ReceivesReminderEmails)).ToList();
     }
 
     public async Task<OperationResult> CreateAsync(UserForm form)
@@ -65,6 +66,7 @@ public class UserAdminService(
             FullName = form.FullName.Trim(),
             // Accounts are created by an admin, so there is no confirmation email step.
             EmailConfirmed = true,
+            ReceivesReminderEmails = form.ReceivesReminderEmails,
         };
         var result = await userManager.CreateAsync(user, form.Password);
         if (!result.Succeeded)
@@ -74,7 +76,7 @@ public class UserAdminService(
         if (!result.Succeeded)
             return OperationResult.From(result);
 
-        await audit.LogAsync(AuditAction.Create, AuditEntity, user.Id, Json(new { form.Role }));
+        await audit.LogAsync(AuditAction.Create, AuditEntity, user.Id, Json(new { form.Role, form.ReceivesReminderEmails }));
         return OperationResult.Ok;
     }
 
@@ -101,6 +103,11 @@ public class UserAdminService(
         {
             user.Email = user.UserName = form.Email.Trim();
             changed.Add("Email");
+        }
+        if (user.ReceivesReminderEmails != form.ReceivesReminderEmails)
+        {
+            user.ReceivesReminderEmails = form.ReceivesReminderEmails;
+            changed.Add(nameof(ApplicationUser.ReceivesReminderEmails));
         }
 
         var result = await userManager.UpdateAsync(user);

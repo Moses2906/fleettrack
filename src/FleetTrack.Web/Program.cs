@@ -6,6 +6,7 @@ using FleetTrack.Web.Data;
 using FleetTrack.Web.Data.Seeding;
 using FleetTrack.Web.Documents;
 using FleetTrack.Web.History;
+using FleetTrack.Web.Reminders;
 using FleetTrack.Web.Security;
 using FleetTrack.Web.Services;
 using Microsoft.AspNetCore.Components.Authorization;
@@ -133,6 +134,12 @@ var storageOptions = builder.Configuration.GetSection("Storage").Get<DocumentSto
 builder.Services.AddSingleton<IDocumentStorage>(new LocalDocumentStorage(
     Path.Combine(builder.Environment.ContentRootPath, storageOptions.DocumentsPath)));
 builder.Services.AddScoped<DocumentService>();
+
+// Morning reminder emails (off until Email__Host and Email__FromAddress are set).
+builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection("Email"));
+builder.Services.AddSingleton<IMailSender, SmtpMailSender>();
+builder.Services.AddScoped<ReminderService>();
+builder.Services.AddHostedService<ReminderBackgroundService>();
 
 // Sign-in cookies are encrypted with keys ASP.NET Core creates itself. On a server those keys must be kept
 // in a fixed folder (DataProtection__KeysPath), or everyone is signed out whenever the app restarts.

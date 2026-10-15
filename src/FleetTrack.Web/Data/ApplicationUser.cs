@@ -12,4 +12,7 @@ public class ApplicationUser : IdentityUser
     /// Disabling keeps the account (and the audit trail that names it) instead of deleting it.
     /// </summary>
     public bool IsActive { get; set; } = true;
+
+    /// <summary>Gets the morning email about licence disks and services that need attention.</summary>
+    public bool ReceivesReminderEmails { get; set; }
 }

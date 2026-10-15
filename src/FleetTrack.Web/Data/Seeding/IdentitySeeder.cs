@@ -24,7 +24,7 @@ public static class IdentitySeeder
 
     public static async Task SeedDemoUsersAsync(UserManager<ApplicationUser> userManager)
     {
-        await EnsureUserAsync(userManager, DemoAdminEmail, "Demo Admin", DemoAdminPassword, Roles.Admin);
+        await EnsureUserAsync(userManager, DemoAdminEmail, "Demo Admin", DemoAdminPassword, Roles.Admin, receivesReminders: true);
         await EnsureUserAsync(userManager, DemoStaffEmail, "Demo Staff", DemoStaffPassword, Roles.Staff);
     }
 
@@ -45,16 +45,20 @@ public static class IdentitySeeder
             return;
         }
 
-        await EnsureUserAsync(userManager, email, config["BootstrapAdmin:FullName"] ?? "Administrator", password, Roles.Admin);
+        await EnsureUserAsync(userManager, email, config["BootstrapAdmin:FullName"] ?? "Administrator", password, Roles.Admin, receivesReminders: true);
         logger.LogInformation("Created the first admin account. Remove the BootstrapAdmin settings now.");
     }
 
-    private static async Task EnsureUserAsync(UserManager<ApplicationUser> userManager, string email, string fullName, string password, string role)
+    private static async Task EnsureUserAsync(UserManager<ApplicationUser> userManager, string email, string fullName, string password, string role,
+        bool receivesReminders = false)
     {
         if (await userManager.FindByEmailAsync(email) is not null)
             return;
 
-        var user = new ApplicationUser { UserName = email, Email = email, FullName = fullName, EmailConfirmed = true };
+        var user = new ApplicationUser
+        {
+            UserName = email, Email = email, FullName = fullName, EmailConfirmed = true, ReceivesReminderEmails = receivesReminders,
+        };
         var result = await userManager.CreateAsync(user, password);
         if (!result.Succeeded)
             throw new InvalidOperationException($"Could not create {email}: {string.Join(" ", result.Errors.Select(e => e.Description))}");

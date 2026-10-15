@@ -51,7 +51,7 @@ Counts of expired licence disks, disks due within 30 days, vehicles with missing
 
 ### Service and maintenance
 - Log services and repairs: date, odometer, type of work, workshop, cost and notes. Odometer readings that go backwards are caught as likely typos.
-- Optional next-service date with in-app reminders for services that are overdue or due within 30 days.
+- Optional next-service date with reminders on the dashboard, the Services page and by email.
 
 ### Licence renewals
 - Record a renewal: purchase date, new expiry, amount, reference and who processed it. **Saving a renewal updates the vehicle's expiry date in the same transaction.**
@@ -61,6 +61,14 @@ Counts of expired licence disks, disks due within 30 days, vehicles with missing
 | Renewals | Vehicle history |
 |---|---|
 | ![Renewals](docs/screenshots/renewals.png) | ![History](docs/screenshots/history.png) |
+
+### Email reminders
+- A morning email to the people an admin chooses. It covers licence disks 30 and 7 days before expiry, on the day and weekly while expired, and services 7 days before and weekly while overdue.
+- **Each reminder is sent once per milestone.** Sent reminders are recorded, so restarts or extra checks never cause duplicates. Renewing a disk starts the reminders afresh, and a failed send is retried.
+- Works with any SMTP provider (Microsoft 365, Gmail, SendGrid, ...). A **Reminder emails** admin page shows the status, recipients, what's waiting, and the sending history, with "send test email" and "send now" buttons.
+- In development, every email is caught by [Mailpit](https://mailpit.axllent.org/) at `http://localhost:8025` instead of going to real inboxes.
+
+<img src="docs/screenshots/reminder-email.png" alt="Reminder email" width="520">
 
 ### Vehicle history and PDF export
 Search any registration to see a five-year timeline of renewals and services, newest first, then export it as a PDF report.
@@ -123,6 +131,7 @@ Security was designed in from the first phase, not added at the end.
 | Authentication | ASP.NET Core Identity (roles, lockout, 2FA, passkeys) |
 | UI | MudBlazor 9, Inter typeface |
 | PDF | QuestPDF |
+| Email | MailKit (SMTP); Mailpit for local development |
 | Tests | xUnit with the EF Core in-memory provider |
 | CI | GitHub Actions (build and run all tests on every push) |
 
@@ -161,7 +170,7 @@ docker compose up -d
 docker ps          # wait until fleettrack-oracle shows (healthy), about 1–2 minutes the first time
 ```
 
-This runs Oracle Database 23ai Free and creates an application user called `fleettrack`.
+This runs Oracle Database 23ai Free (creating an application user called `fleettrack`) and Mailpit, a local inbox that catches FleetTrack's reminder emails at **http://localhost:8025**.
 
 ### 3. Give the app its connection string (kept out of source code)
 
@@ -178,7 +187,7 @@ dotnet dev-certs https --trust     # once, so the browser trusts the local HTTPS
 dotnet run --project src/FleetTrack.Web --launch-profile https
 ```
 
-Open **https://localhost:7282**. In Development the app creates the tables and loads 20 fictional vehicles, with five years of renewals and services, on first start.
+Open **https://localhost:7282**. In Development the app creates the tables and loads 20 fictional vehicles, with five years of renewals and services, on first start. The demo admin receives reminder emails, which you can read in Mailpit; use **Administration → Reminder emails → Send today's reminders now** to try it.
 
 To query the data directly, connect SQL Developer (or the SQL Developer extension for VS Code) to `localhost:1521`, service `FREEPDB1`, user `fleettrack`. Table and column names are plain Oracle style:
 
@@ -205,7 +214,7 @@ On a real installation, the first admin is created from the `BootstrapAdmin__*` 
 dotnet test
 ```
 
-The 148 tests need no database: they use EF Core's in-memory provider and a temporary folder for files. They cover:
+The 182 tests need no database: they use EF Core's in-memory provider and a temporary folder for files. They cover:
 
 - **Business rules:** disk expiry status and its 30-day boundary; renewals updating the expiry date (and never moving it backwards); reverting a deleted renewal; service reminders; odometer checks; SA registration, ID number and company number validation; file-type detection.
 - **Role permissions:** the permission table, plus Staff being refused every create, edit, upload and delete when calling the services directly.
@@ -213,6 +222,7 @@ The 148 tests need no database: they use EF Core's in-memory provider and a temp
 - **Audit and POPIA:** values are logged for vehicle data, but ID numbers and free-text notes never are.
 - **Documents:** disguised files and files over 10 MB are rejected, replacing a copy deletes the old file, tampered files are refused, and deleting a vehicle deletes its files.
 - **PDF:** a report is generated for every seeded vehicle.
+- **Email reminders:** milestone dates, one email per opted-in active user, no duplicates, retries after a failed send, and no HTML injection from data typed into FleetTrack.
 
 ## Configuration
 
@@ -224,6 +234,11 @@ Settings come from `appsettings.json`, user secrets (development) or environment
 | `Storage__DocumentsPath` | Folder for uploaded documents. Default `App_Data/documents`; on a server use a folder outside the app. |
 | `DataProtection__KeysPath` | Folder for the keys that encrypt sign-in cookies, so restarts don't sign everyone out |
 | `BootstrapAdmin__Email`, `BootstrapAdmin__Password`, `BootstrapAdmin__FullName` | Creates the first admin on a fresh production database; remove afterwards |
+| `Email__Host`, `Email__Port`, `Email__Security` | SMTP server, e.g. `smtp.office365.com`, `587`, `StartTls`. Reminders are off until `Email__Host` and `Email__FromAddress` are set. |
+| `Email__Username`, `Email__Password` | SMTP login. For Gmail use an [app password](https://support.google.com/accounts/answer/185833); keep it in a secret or environment variable. |
+| `Email__FromAddress`, `Email__FromName` | Sender, e.g. `fleettrack@yourcompany.co.za` and `FleetTrack` |
+| `Email__AppBaseUrl` | The address staff open FleetTrack on, for links in emails |
+| `Email__SendHour` | Hour (South African time) after which the morning email goes out. Default `7`. |
 | `ASPNETCORE_ENVIRONMENT` | `Development` applies migrations and loads demo data automatically; `Production` does neither |
 
 In production, apply database changes deliberately with a reviewed script:
@@ -246,6 +261,7 @@ src/
     Data/                 DbContext, EF configurations, migrations, audit logging, demo seeding
     Documents/            File storage, upload rules and the /documents endpoint
     History/              Timeline and PDF report
+    Reminders/            Morning reminder emails (SMTP sender, milestone tracking, background job)
     Security/             Permission checks, sign-in rules, security headers
     Services/             Application services: every read and write goes through these
 tests/
@@ -267,9 +283,10 @@ docker-compose.yml        Local Oracle Database Free
 
 - [MudBlazor](https://github.com/MudBlazor/MudBlazor) is MIT-licensed.
 - [Inter](https://rsms.me/inter/) is used under the SIL Open Font License; see `src/FleetTrack.Web/wwwroot/fonts/INTER-LICENSE.txt`.
-- [QuestPDF](https://www.questpdf.com/license/) is used under its **Community licence**, which is free for organisations with annual gross revenue under USD 1 million. A larger organisation running FleetTrack needs a QuestPDF commercial licence.
+- [QuestPDF](https://www.questpdf.com/license/) is used under its **Community licence**, which is free for organisations with annual gross revenue under USD 1 million. FleetTrack's owner is a small business that qualifies; a larger organisation would need a QuestPDF commercial licence.
+- [MailKit](https://github.com/jstedfast/MailKit) and [Mailpit](https://github.com/axllent/mailpit) are MIT-licensed.
 - [Oracle Database Free](https://www.oracle.com/database/free/) is free to download and use; check Oracle's licence terms before using it in production.
 
 ---
 
-Built by [Moses2906](https://github.com/Moses2906) as a working tool for a vehicle roadworthy centre and as a portfolio project.
+Built by [Moses2906](https://github.com/Moses2906) as a working tool for a vehicle roadworthy centre and as a portfolio project. © 2026, all rights reserved; see [LICENSE](LICENSE).

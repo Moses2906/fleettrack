@@ -50,7 +50,7 @@ internal sealed class AuditEntryBuilder
     /// <summary>Collects every pending create/update/delete of FleetTrack's own records.</summary>
     public static List<AuditEntryBuilder> Collect(ChangeTracker changeTracker) =>
         changeTracker.Entries()
-            .Where(e => e.Entity is not AuditLog && e.Metadata.ClrType.Namespace == typeof(Vehicle).Namespace)
+            .Where(e => e.Entity is not (AuditLog or ReminderSent) && e.Metadata.ClrType.Namespace == typeof(Vehicle).Namespace)
             .Select(e => e.State switch
             {
                 EntityState.Added => new AuditEntryBuilder(e, AuditAction.Create),

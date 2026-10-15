@@ -13,6 +13,8 @@
                     <MudSelectItem Value="@Roles.Staff">Staff: view records, add services, view documents</MudSelectItem>
                     <MudSelectItem Value="@Roles.Admin">Admin: full access, including deleting and users</MudSelectItem>
                 </MudSelect>
+                <MudSwitch @bind-Value="model.ReceivesReminderEmails" Color="Color.Primary"
+                           Label="Reminder emails: licence disks and services needing attention" />
                 @if (IsNew)
                 {
                     <PasswordField @bind-Value="model.Password" />
@@ -48,6 +50,7 @@
             model.FullName = Existing.FullName;
             model.Email = Existing.Email;
             model.Role = Existing.Role;
+            model.ReceivesReminderEmails = Existing.ReceivesReminderEmails;
         }
         else
         {
@@ -59,7 +62,7 @@
     {
         saving = true;
         error = null;
-        var form = new UserForm(model.FullName, model.Email, model.Role, model.Password);
+        var form = new UserForm(model.FullName, model.Email, model.Role, model.Password, model.ReceivesReminderEmails);
         var result = IsNew ? await UserAdmin.CreateAsync(form) : await UserAdmin.UpdateAsync(Existing!.Id, form);
         saving = false;
 
@@ -81,5 +84,7 @@
         public string Role { get; set; } = Roles.Staff;
 
         public string? Password { get; set; }
+
+        public bool ReceivesReminderEmails { get; set; }
     }
 }

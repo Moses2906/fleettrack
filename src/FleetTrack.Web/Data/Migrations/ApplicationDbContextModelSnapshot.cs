@@ -225,6 +225,56 @@ namespace FleetTrack.Web.Data.Migrations
                     b.ToTable("LICENCE_RENEWALS", (string)null);
                 });
 
+            modelBuilder.Entity("FleetTrack.Core.Entities.ReminderSent", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("NUMBER(19)")
+                        .HasColumnName("ID");
+
+                    OraclePropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("DueDate")
+                        .HasColumnType("DATE")
+                        .HasColumnName("DUE_DATE");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("NVARCHAR2(30)")
+                        .HasColumnName("KIND");
+
+                    b.Property<string>("Milestone")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("NVARCHAR2(20)")
+                        .HasColumnName("MILESTONE");
+
+                    b.Property<int>("RecipientCount")
+                        .HasColumnType("NUMBER(10)")
+                        .HasColumnName("RECIPIENT_COUNT");
+
+                    b.Property<DateTime>("SentAtUtc")
+                        .HasColumnType("TIMESTAMP(7)")
+                        .HasColumnName("SENT_AT_UTC");
+
+                    b.Property<int>("VehicleId")
+                        .HasColumnType("NUMBER(10)")
+                        .HasColumnName("VEHICLE_ID");
+
+                    b.HasKey("Id")
+                        .HasName("PK_REMINDERS_SENT");
+
+                    b.HasIndex("VehicleId")
+                        .HasDatabaseName("IX_REMINDERS_SENT_VEHICLE_ID");
+
+                    b.HasIndex("Kind", "VehicleId", "DueDate", "Milestone")
+                        .IsUnique()
+                        .HasDatabaseName("IX_REMINDERS_SENT_KIND_VEHICLE_ID_DUE_DATE_MILESTONE");
+
+                    b.ToTable("REMINDERS_SENT", (string)null);
+                });
+
             modelBuilder.Entity("FleetTrack.Core.Entities.RenewalStep", b =>
                 {
                     b.Property<int>("Id")
@@ -701,6 +751,12 @@ namespace FleetTrack.Web.Data.Migrations
                         .HasColumnType("BOOLEAN")
                         .HasColumnName("PHONE_NUMBER_CONFIRMED");
 
+                    b.Property<bool>("ReceivesReminderEmails")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("BOOLEAN")
+                        .HasDefaultValue(false)
+                        .HasColumnName("RECEIVES_REMINDER_EMAILS");
+
                     b.Property<string>("SecurityStamp")
                         .HasColumnType("NVARCHAR2(2000)")
                         .HasColumnName("SECURITY_STAMP");
@@ -926,6 +982,18 @@ namespace FleetTrack.Web.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("FK_LICENCE_RENEWALS_VEHICLES_VEHICLE_ID");
+
+                    b.Navigation("Vehicle");
+                });
+
+            modelBuilder.Entity("FleetTrack.Core.Entities.ReminderSent", b =>
+                {
+                    b.HasOne("FleetTrack.Core.Entities.Vehicle", "Vehicle")
+                        .WithMany()
+                        .HasForeignKey("VehicleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_REMINDERS_SENT_VEHICLES_VEHICLE_ID");
 
                     b.Navigation("Vehicle");
                 });

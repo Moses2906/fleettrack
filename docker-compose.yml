@@ -1,4 +1,4 @@
-# Local development database: Oracle Database Free 23ai.
+# Local development: Oracle Database Free 23ai, plus Mailpit to catch reminder emails.
 # Start with:  docker compose up -d     (first start takes a minute or two)
 # Passwords come from the .env file next to this one (copy .env.example to .env).
 services:
@@ -19,6 +19,15 @@ services:
       timeout: 5s
       retries: 20
       start_period: 30s
+
+  # Development only: a fake mail server. FleetTrack's reminder emails land here instead of real inboxes.
+  # Read them at http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:v1.31
+    container_name: fleettrack-mailpit
+    ports:
+      - "8025:8025"   # web inbox
+      - "1025:1025"   # SMTP, used by FleetTrack in Development
 
 volumes:
   oracle-data:

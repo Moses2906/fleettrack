@@ -1,0 +1,143 @@
+@page "/admin/reminders"
+@attribute [Authorize(Policy = nameof(Permission.ManageUsers))]
+@inject ReminderService Reminders
+@inject ISnackbar Snackbar
+@inject Microsoft.Extensions.Options.IOptions<EmailOptions> EmailSettings
+
+<PageTitle>Reminder emails · FleetTrack</PageTitle>
+
+<PageHeader Title="Reminder emails"
+            Subtitle="A morning email about licence disks (30 and 7 days before expiry, then weekly while expired) and services (7 days before, then weekly while overdue). Each reminder is sent once.">
+    <Actions>
+        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Rounded.Send" OnClick="SendTestAsync" Disabled="busy || !Reminders.IsConfigured">Send test email to me</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.MarkEmailUnread" OnClick="SendNowAsync"
+                   Disabled="busy || !Reminders.IsConfigured || pending is not { Count: > 0 }">Send today's reminders now</MudButton>
+    </Actions>
+</PageHeader>
+
+<MudGrid Spacing="4">
+    <MudItem xs="12" md="5">
+        <MudPaper Outlined="true" Elevation="0" Class="pa-4 mb-4">
+            <MudText Typo="Typo.h6" Class="mb-2">Status</MudText>
+            @if (Reminders.IsConfigured)
+            {
+                <MudAlert Severity="Severity.Success" Dense="true" Class="mb-3">Email is set up. Reminders go out each morning after @($"{EmailSettings.Value.SendHour:00}:00").</MudAlert>
+                <MudSimpleTable Dense="true" Elevation="0" Class="ft-facts">
+                    <tbody>
+                        <tr><td>Mail server</td><td>@EmailSettings.Value.Host : @EmailSettings.Value.Port</td></tr>
+                        <tr><td>Sent from</td><td>@EmailSettings.Value.FromAddress</td></tr>
+                        <tr><td>Links open</td><td>@(EmailSettings.Value.AppBaseUrl ?? "not set (no links in emails)")</td></tr>
+                    </tbody>
+                </MudSimpleTable>
+            }
+            else
+            {
+                <MudAlert Severity="Severity.Warning" Dense="true">
+                    Email isn't set up yet, so no reminders are sent. Set <code>Email__Host</code>, <code>Email__FromAddress</code> and the login details
+                    on the server (see the README).
+                </MudAlert>
+            }
+        </MudPaper>
+
+        <MudPaper Outlined="true" Elevation="0" Class="pa-4">
+            <div class="d-flex justify-space-between align-center mb-2">
+                <MudText Typo="Typo.h6">Who gets them</MudText>
+                <MudButton Href="admin/users" Size="Size.Small" EndIcon="@Icons.Material.Rounded.ChevronRight">Change</MudButton>
+            </div>
+            @if (recipients is { Count: 0 })
+            {
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">Nobody yet. Turn on "Reminder emails" for a user on the Users page.</MudText>
+            }
+            else if (recipients is not null)
+            {
+                @foreach (var r in recipients)
+                {
+                    <div class="py-1"><MudText Typo="Typo.body2"><b>@r.FullName</b> · @r.Email</MudText></div>
+                }
+            }
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" md="7">
+        <MudPaper Outlined="true" Elevation="0" Class="pa-4 mb-4">
+            <MudText Typo="Typo.h6" Class="mb-2">Waiting to be sent</MudText>
+            @if (pending is null)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+            }
+            else if (pending.Count == 0)
+            {
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">Nothing new. Every current reminder has already been sent.</MudText>
+            }
+            else
+            {
+                @foreach (var item in pending)
+                {
+                    <div class="d-flex justify-space-between gap-2 py-1">
+                        <MudText Typo="Typo.body2"><span class="ft-reg">@item.RegistrationNumber</span> · @(item.Kind == ReminderKind.LicenceDisk ? "Licence disk" : "Service")</MudText>
+                        <MudText Typo="Typo.body2" Color="@(item.DueDate < Reminders.Today ? Color.Error : Color.Warning)">@item.Description</MudText>
+                    </div>
+                }
+            }
+        </MudPaper>
+
+        <MudPaper Outlined="true" Elevation="0">
+            <MudText Typo="Typo.h6" Class="pa-4 pb-0">Recently sent</MudText>
+            <MudTable Items="history" Dense="true" Elevation="0" Breakpoint="Breakpoint.Sm" Loading="history is null">
+                <HeaderContent><MudTh>Sent</MudTh><MudTh>Vehicle</MudTh><MudTh>About</MudTh><MudTh>Recipients</MudTh></HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Sent">@SouthAfricanTime.ToLocal(context.SentAtUtc).ToString("dd MMM yyyy HH:mm")</MudTd>
+                    <MudTd DataLabel="Vehicle"><span class="ft-reg">@context.RegistrationNumber</span></MudTd>
+                    <MudTd DataLabel="About">@(context.Kind == ReminderKind.LicenceDisk ? "Disk" : "Service") due @context.DueDate.ToString("dd MMM yyyy")</MudTd>
+                    <MudTd DataLabel="Recipients">@context.RecipientCount</MudTd>
+                </RowTemplate>
+                <NoRecordsContent><EmptyState Icon="@Icons.Material.Rounded.MailOutline" Title="No reminders sent yet" /></NoRecordsContent>
+            </MudTable>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState> AuthState { get; set; } = default!;
+
+    private List<ReminderItem>? pending;
+    private List<ReminderRecipient>? recipients;
+    private List<ReminderHistoryRow>? history;
+    private bool busy;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        history = await Reminders.HistoryAsync(); // checks the admin permission first
+        pending = await Reminders.PendingAsync();
+        recipients = await Reminders.RecipientsAsync();
+    }
+
+    private async Task SendTestAsync()
+    {
+        busy = true;
+        var email = (await AuthState).User.Identity?.Name ?? "";
+        var result = await Reminders.SendTestAsync(email);
+        busy = false;
+        Snackbar.Add(result.Outcome == ReminderRunOutcome.Sent ? $"Test email sent to {email}." : $"Couldn't send: {result.Error ?? result.Outcome.ToString()}",
+            result.Outcome == ReminderRunOutcome.Sent ? Severity.Success : Severity.Error);
+    }
+
+    private async Task SendNowAsync()
+    {
+        busy = true;
+        var result = await Reminders.RunNowAsync();
+        busy = false;
+        var (message, severity) = result.Outcome switch
+        {
+            ReminderRunOutcome.Sent => ($"Sent {result.ItemCount} reminder(s) to {result.RecipientCount} person(s).", Severity.Success),
+            ReminderRunOutcome.NoRecipients => ("Nobody is set to receive reminders. Turn it on for someone on the Users page.", Severity.Warning),
+            ReminderRunOutcome.NothingDue => ("Nothing new to send.", Severity.Info),
+            ReminderRunOutcome.NotConfigured => ("Email isn't set up.", Severity.Warning),
+            _ => ($"Couldn't send: {result.Error}", Severity.Error),
+        };
+        Snackbar.Add(message, severity);
+        await LoadAsync();
+    }
+}

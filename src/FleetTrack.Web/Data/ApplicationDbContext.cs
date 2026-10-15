@@ -27,6 +27,7 @@ public partial class ApplicationDbContext(
     public DbSet<LicenceRenewal> LicenceRenewals => Set<LicenceRenewal>();
     public DbSet<RenewalStep> RenewalSteps => Set<RenewalStep>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<ReminderSent> RemindersSent => Set<ReminderSent>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -43,6 +44,7 @@ public partial class ApplicationDbContext(
         }
 
         builder.Entity<ApplicationUser>().Property(u => u.FullName).HasMaxLength(100);
+        builder.Entity<ApplicationUser>().Property(u => u.ReceivesReminderEmails).HasDefaultValue(false);
 
         // Picks up every IEntityTypeConfiguration<T> class in the Data/Configurations folder.
         builder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);

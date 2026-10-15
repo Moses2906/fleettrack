@@ -27,6 +27,7 @@
             <MudTh>Email</MudTh>
             <MudTh>Role</MudTh>
             <MudTh>Status</MudTh>
+            <MudTh>Reminders</MudTh>
             <MudTh Style="text-align: right">Actions</MudTh>
         </HeaderContent>
         <RowTemplate>
@@ -48,6 +49,14 @@
                 else
                 {
                     <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Success" Icon="@Icons.Material.Rounded.CheckCircle">Active</MudChip>
+                }
+            </MudTd>
+            <MudTd DataLabel="Reminders">
+                @if (context.ReceivesReminderEmails)
+                {
+                    <MudTooltip Text="Gets the morning reminder email">
+                        <MudIcon Icon="@Icons.Material.Rounded.MarkEmailRead" Color="Color.Primary" Size="Size.Small" aria-label="Gets reminder emails" />
+                    </MudTooltip>
                 }
             </MudTd>
             <MudTd DataLabel="Actions" Style="text-align: right">
