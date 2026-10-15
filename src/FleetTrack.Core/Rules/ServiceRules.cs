@@ -11,8 +11,29 @@ public enum ServiceReminder
     Overdue
 }
 
+/// <summary>What to do about the next service when one is marked as done.</summary>
+public enum NextServiceBooking
+{
+    SameDateNextYear,
+    InSixMonths,
+    PickADate,
+    DontBook
+}
+
 public static class ServiceRules
 {
+    /// <summary>
+    /// The next-service date to remember (which drives the reminder email). "Same date next year"
+    /// counts from the day the service was done.
+    /// </summary>
+    public static DateOnly? NextServiceDate(NextServiceBooking booking, DateOnly serviceDate, DateOnly? pickedDate = null) => booking switch
+    {
+        NextServiceBooking.SameDateNextYear => serviceDate.AddYears(1),
+        NextServiceBooking.InSixMonths => serviceDate.AddMonths(6),
+        NextServiceBooking.PickADate => pickedDate,
+        _ => null,
+    };
+
     public const int DueSoonDays = 30;
 
     public static ServiceReminder GetReminder(DateOnly? nextServiceDue, DateOnly today)

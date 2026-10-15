@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using System.Text.Json;
 using FleetTrack.Core.Entities;
 using FleetTrack.Core.Rules;
@@ -120,27 +119,9 @@ public class DocumentService(
     {
         await permissions.DemandAsync(Permission.UploadDocuments);
 
-        if (!DocumentFileRules.HasAllowedExtension(fileName))
-            return OperationResult.Fail("Only PDF, JPG and PNG files can be uploaded.");
-
-        // Read into memory (at most 10 MB), refusing to read past the limit even if the browser lied about the size.
-        using var buffer = new MemoryStream();
-        var limited = new byte[81920];
-        int read;
-        while ((read = await content.ReadAsync(limited, cancellationToken)) > 0)
-        {
-            if (buffer.Length + read > DocumentFileRules.MaxBytes)
-                return OperationResult.Fail("That file is larger than 10 MB. Please scan at a lower resolution or compress it.");
-            buffer.Write(limited, 0, read);
-        }
-        if (buffer.Length == 0)
-            return OperationResult.Fail("That file is empty.");
-
-        var detected = DocumentFileRules.DetectType(buffer.GetBuffer().AsSpan(0, (int)Math.Min(buffer.Length, DocumentFileRules.HeaderBytesNeeded)));
-        if (detected is null)
-            return OperationResult.Fail("That file isn't a real PDF, JPG or PNG. If it is a scan, save it again as PDF and retry.");
-
-        var hash = Convert.ToHexStringLower(SHA256.HashData(buffer.GetBuffer().AsSpan(0, (int)buffer.Length)));
+        var (upload, error) = await UploadedFile.ReadAsync(content, fileName, cancellationToken);
+        if (upload is null)
+            return OperationResult.Fail(error!);
 
         await using var db = await dbFactory.CreateDbContextAsync();
         var vehicle = await db.Vehicles.SingleOrDefaultAsync(v => v.Id == vehicleId, cancellationToken);
@@ -148,8 +129,7 @@ public class DocumentService(
             return OperationResult.Fail("This vehicle has been deleted.");
 
         // 1. Save the new file first...
-        buffer.Position = 0;
-        var storedName = await storage.SaveAsync(buffer, cancellationToken);
+        var storedName = await storage.SaveAsync(new MemoryStream(upload.Content), cancellationToken);
 
         var actor = await currentUser.GetActorAsync();
         var document = await db.VehicleDocuments.SingleOrDefaultAsync(d => d.VehicleId == vehicleId && d.DocumentType == type, cancellationToken);
@@ -159,11 +139,11 @@ public class DocumentService(
             document = new VehicleDocument { VehicleId = vehicleId, DocumentType = type };
             db.VehicleDocuments.Add(document);
         }
-        document.OriginalFileName = DocumentFileRules.CleanFileName(fileName);
+        document.OriginalFileName = upload.FileName;
         document.StoredFileName = storedName;
-        document.ContentType = detected.ContentType;
-        document.FileSizeBytes = buffer.Length;
-        document.Sha256 = hash;
+        document.ContentType = upload.ContentType;
+        document.FileSizeBytes = upload.Size;
+        document.Sha256 = upload.Sha256;
         document.UploadedAtUtc = DateTime.UtcNow;
         document.UploadedBy = actor.UserName ?? "unknown";
         document.Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
@@ -246,7 +226,7 @@ public class DocumentService(
         }
 
         // The hash recorded at upload must still match, otherwise the file on disk has been altered or corrupted.
-        if (!string.Equals(Convert.ToHexStringLower(SHA256.HashData(content)), document.Sha256, StringComparison.Ordinal))
+        if (!UploadedFile.MatchesFingerprint(content, document.Sha256))
         {
             logger.LogError("Document {DocumentId} failed its integrity check: the stored file has changed since upload.", documentId);
             return null;

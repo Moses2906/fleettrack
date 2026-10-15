@@ -43,7 +43,8 @@
                         <div class="d-flex align-center gap-2">
                             <ServiceReminderChip DueDate="r.NextServiceDue" Today="today" />
                             <AuthorizeView Policy="@nameof(Permission.AddServiceRecords)">
-                                <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="() => LogAsync(r.VehicleId)">Log service</MudButton>
+                                <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.TaskAlt"
+                                           OnClick="() => MarkDoneAsync(r)">Mark as done</MudButton>
                             </AuthorizeView>
                         </div>
                     </div>
@@ -78,7 +79,7 @@
     <MudTable Items="services" Filter="Matches" Loading="services is null" Hover="true" Dense="true" Elevation="0" Breakpoint="Breakpoint.Sm" RowsPerPage="25">
         <HeaderContent>
             <MudTh>Date</MudTh><MudTh>Vehicle</MudTh><MudTh>Work</MudTh><MudTh>Workshop</MudTh>
-            <MudTh Style="text-align: right">Odometer</MudTh><MudTh Style="text-align: right">Cost</MudTh>
+            <MudTh Style="text-align: right">Odometer</MudTh><MudTh Style="text-align: right">Cost</MudTh><MudTh></MudTh>
         </HeaderContent>
         <RowTemplate>
             <MudTd DataLabel="Date" Style="white-space: nowrap">@context.ServiceDate.ToString("dd MMM yyyy")</MudTd>
@@ -90,6 +91,14 @@
             <MudTd DataLabel="Workshop">@context.Workshop</MudTd>
             <MudTd DataLabel="Odometer" Style="text-align: right; white-space: nowrap">@context.OdometerKm.ToString("#,##0") km</MudTd>
             <MudTd DataLabel="Cost" Style="text-align: right; white-space: nowrap">@DisplayNames.Money(context.Cost)</MudTd>
+            <MudTd Style="text-align: right">
+                @if (context.HasInvoice)
+                {
+                    <MudTooltip Text="@($"Invoice: {context.InvoiceFileName}")">
+                        <MudIconButton Href="@($"invoices/{context.Id}")" Target="_blank" Icon="@Icons.Material.Rounded.Receipt" Size="Size.Small" aria-label="Open invoice" />
+                    </MudTooltip>
+                }
+            </MudTd>
         </RowTemplate>
         <NoRecordsContent><EmptyState Icon="@Icons.Material.Rounded.SearchOff" Title="No services match" /></NoRecordsContent>
         <PagerContent><MudTablePager PageSizeOptions="[25, 50, 100]" /></PagerContent>
@@ -135,14 +144,19 @@
             || s.Workshop.Contains(search, StringComparison.OrdinalIgnoreCase);
     }
 
-    private async Task LogAsync(int? vehicleId)
+    private Task LogAsync(int? vehicleId) => OpenServiceDialogAsync("Log service", vehicleId, markAsDone: false);
+
+    private Task MarkDoneAsync(ServiceReminderRow reminder) =>
+        OpenServiceDialogAsync($"Service done · {reminder.RegistrationNumber}", reminder.VehicleId, markAsDone: true);
+
+    private async Task OpenServiceDialogAsync(string title, int? vehicleId, bool markAsDone)
     {
-        var dialog = await Dialogs.ShowAsync<ServiceDialog>("Log service",
-            new DialogParameters<ServiceDialog> { { d => d.VehicleId, vehicleId } },
+        var dialog = await Dialogs.ShowAsync<ServiceDialog>(title,
+            new DialogParameters<ServiceDialog> { { d => d.VehicleId, vehicleId }, { d => d.MarkAsDone, markAsDone } },
             new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
-        if ((await dialog.Result) is { Canceled: false })
+        if ((await dialog.Result) is { Canceled: false } result)
         {
-            Snackbar.Add("Service logged.", Severity.Success);
+            Snackbar.Add(result.Data is DateOnly next ? $"Service saved. Next service booked for {next:dd MMM yyyy}." : "Service saved.", Severity.Success);
             await LoadAsync();
         }
     }

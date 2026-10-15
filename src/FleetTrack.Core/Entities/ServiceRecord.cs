@@ -15,6 +15,15 @@ public class ServiceRecord
     public string? Notes { get; set; }
     public DateOnly? NextServiceDueDate { get; set; }
 
+    // Optional invoice copy, stored like vehicle documents: outside the website, under a random name.
+    public string? InvoiceFileName { get; set; }
+    public string? InvoiceStoredFileName { get; set; }
+    public string? InvoiceContentType { get; set; }
+    public long? InvoiceFileSizeBytes { get; set; }
+    public string? InvoiceSha256 { get; set; }
+
+    public bool HasInvoice => InvoiceStoredFileName is not null;
+
     public DateTime CreatedAtUtc { get; set; }
     /// <summary>Login name as text, not a foreign key, so history survives the user account being removed.</summary>
     public string CreatedBy { get; set; } = string.Empty;

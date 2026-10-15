@@ -1,3 +1,4 @@
+@using Microsoft.AspNetCore.Components.Forms
 @inject ServiceLogService ServiceLog
 @inject PermissionService Permissions
 @inject IDialogService Dialogs
@@ -13,7 +14,17 @@
     </div>
     @if (canAdd)
     {
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.Add" Size="Size.Small" OnClick="() => EditAsync(null)">Log service</MudButton>
+        <div class="d-flex gap-2">
+            @if (ServiceRules.GetReminder(NextDue, ServiceLog.Today) is ServiceReminder.Overdue or ServiceReminder.DueSoon)
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.TaskAlt" Size="Size.Small" OnClick="() => EditAsync(null, markAsDone: true)">Mark service as done</MudButton>
+                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Rounded.Add" Size="Size.Small" OnClick="() => EditAsync(null)">Log other work</MudButton>
+            }
+            else
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.Add" Size="Size.Small" OnClick="() => EditAsync(null)">Log service</MudButton>
+            }
+        </div>
     }
 </div>
 
@@ -36,6 +47,22 @@
         <MudTd DataLabel="Odometer" Style="text-align: right; white-space: nowrap">@context.OdometerKm.ToString("#,##0") km</MudTd>
         <MudTd DataLabel="Cost" Style="text-align: right; white-space: nowrap">@DisplayNames.Money(context.Cost)</MudTd>
         <MudTd Style="text-align: right; white-space: nowrap">
+            @if (context.HasInvoice)
+            {
+                <MudTooltip Text="@($"Invoice: {context.InvoiceFileName}")">
+                    <MudIconButton Href="@($"invoices/{context.Id}")" Target="_blank" Icon="@Icons.Material.Rounded.Receipt" Size="Size.Small" aria-label="Open invoice" />
+                </MudTooltip>
+            }
+            else if (canEdit)
+            {
+                <MudFileUpload T="IBrowserFile" FilesChanged="file => AttachInvoiceAsync(context, file)" Accept=".pdf,.jpg,.jpeg,.png" Class="d-inline-flex">
+                    <CustomContent Context="upload">
+                        <MudTooltip Text="Attach invoice">
+                            <MudIconButton Icon="@Icons.Material.Rounded.ReceiptLong" Size="Size.Small" Class="mud-text-disabled" OnClick="upload.OpenFilePickerAsync" aria-label="Attach invoice" />
+                        </MudTooltip>
+                    </CustomContent>
+                </MudFileUpload>
+            }
             @if (canEdit)
             {
                 <MudIconButton Icon="@Icons.Material.Rounded.Edit" Size="Size.Small" OnClick="() => EditAsync(context.Id)" aria-label="Edit service" />
@@ -73,16 +100,32 @@
 
     private async Task LoadAsync() => services = await ServiceLog.ListAsync(VehicleId);
 
-    private async Task EditAsync(int? serviceId)
+    private async Task EditAsync(int? serviceId, bool markAsDone = false)
     {
-        var dialog = await Dialogs.ShowAsync<ServiceDialog>(serviceId is null ? "Log service" : "Edit service",
-            new DialogParameters<ServiceDialog> { { d => d.VehicleId, VehicleId }, { d => d.ServiceId, serviceId } },
+        var title = serviceId is not null ? "Edit service" : markAsDone ? "Service done" : "Log service";
+        var dialog = await Dialogs.ShowAsync<ServiceDialog>(title,
+            new DialogParameters<ServiceDialog> { { d => d.VehicleId, VehicleId }, { d => d.ServiceId, serviceId }, { d => d.MarkAsDone, markAsDone } },
             new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
-        if ((await dialog.Result) is { Canceled: false })
+        if ((await dialog.Result) is { Canceled: false } result)
         {
-            Snackbar.Add(serviceId is null ? "Service logged." : "Service updated.", Severity.Success);
+            Snackbar.Add(result.Data is DateOnly next && serviceId is null ? $"Service saved. Next service booked for {next:dd MMM yyyy}." : "Service saved.", Severity.Success);
             await LoadAsync();
         }
+    }
+
+    private async Task AttachInvoiceAsync(ServiceRow service, IBrowserFile? file)
+    {
+        if (file is null)
+            return;
+        if (file.Size > DocumentFileRules.MaxBytes)
+        {
+            Snackbar.Add("That invoice is larger than 10 MB.", Severity.Error);
+            return;
+        }
+        await using var stream = file.OpenReadStream(DocumentFileRules.MaxBytes);
+        var result = await ServiceLog.AttachInvoiceAsync(service.Id, new InvoiceUpload(stream, file.Name));
+        Snackbar.Add(result.Succeeded ? "Invoice attached." : result.Error ?? "Couldn't attach the invoice.", result.Succeeded ? Severity.Success : Severity.Error);
+        await LoadAsync();
     }
 
     private async Task DeleteAsync(ServiceRow service)

@@ -34,6 +34,22 @@ public static class DocumentEndpoints
             return Results.File(file.Content, file.ContentType);
         })
         .RequireAuthorization(nameof(Permission.ViewDocuments));
+
+        // GET /invoices/{serviceId}  (and ?download=true): a service's invoice, for anyone who can see the service log.
+        endpoints.MapGet("/invoices/{serviceId:int}", async (int serviceId, bool? download, HttpContext context, FleetTrack.Web.Services.ServiceLogService services) =>
+        {
+            var file = await services.OpenInvoiceAsync(serviceId, download == true);
+            if (file is null)
+                return Results.NotFound();
+
+            context.Response.Headers.CacheControl = "no-store, private";
+            context.Response.Headers.ContentSecurityPolicy = "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; object-src 'self'; frame-ancestors 'self'";
+            if (download == true)
+                return Results.File(file.Content, file.ContentType, fileDownloadName: file.FileName);
+            SetInlineFileName(context.Response, file.FileName);
+            return Results.File(file.Content, file.ContentType);
+        })
+        .RequireAuthorization(nameof(Permission.ViewRecords));
     }
 
     /// <summary>

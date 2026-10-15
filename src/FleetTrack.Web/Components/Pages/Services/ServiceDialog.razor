@@ -1,77 +1,121 @@
+@using Microsoft.AspNetCore.Components.Forms
 @inject ServiceLogService ServiceLog
 @inject VehicleService Vehicles
 
+@* Logs a service (or marks a due one as done), with an optional invoice and the next booking. *@
 <MudDialog>
     <DialogContent>
         @if (form is not null)
         {
             <EditForm Model="form" OnValidSubmit="SaveAsync" id="service-form">
                 <DataAnnotationsValidator />
-                <MudGrid Spacing="3">
+                <MudStack Spacing="4">
                     @if (VehicleId is null && ServiceId is null)
                     {
-                        <MudItem xs="12">
-                            @* Type to search: works for a fleet of any size. *@
+                        <div>
                             <MudAutocomplete T="VehicleRow" Value="selectedVehicle" ValueChanged="OnVehicleChosen" SearchFunc="SearchVehicles"
                                              ToStringFunc="@(v => v is null ? "" : $"{v.RegistrationNumber} · {v.MakeAndModel}")"
                                              Label="Vehicle" Variant="Variant.Outlined" ResetValueOnEmptyText="true" AutoFocus="true" />
                             <ValidationMessage For="() => form.VehicleId" class="validation-message" />
-                        </MudItem>
+                        </div>
                     }
-                    <MudItem xs="12" sm="6">
-                        <MudDatePicker @bind-Date="form.ServiceDate" For="() => form.ServiceDate" Label="Date of service"
-                                       Variant="Variant.Outlined" DateFormat="dd MMM yyyy" Editable="true" MaxDate="DateTime.Today" />
-                    </MudItem>
-                    <MudItem xs="12" sm="6">
-                        <MudNumericField @bind-Value="form.OdometerKm" For="() => form.OdometerKm" Label="Odometer" Variant="Variant.Outlined"
-                                         Adornment="Adornment.End" AdornmentText="km" HideSpinButtons="true" />
-                    </MudItem>
-                    <MudItem xs="12" sm="6">
-                        <MudSelect T="WorkType" @bind-Value="form.WorkType" Label="Type of work" Variant="Variant.Outlined">
-                            @foreach (var type in Enum.GetValues<WorkType>())
-                            {
-                                <MudSelectItem Value="type">@DisplayNames.Of(type)</MudSelectItem>
-                            }
-                        </MudSelect>
-                    </MudItem>
-                    <MudItem xs="12" sm="6">
-                        <MudNumericField @bind-Value="form.Cost" For="() => form.Cost" Label="Cost" Variant="Variant.Outlined"
-                                         Adornment="Adornment.Start" AdornmentText="R" HideSpinButtons="true" Format="0.00" />
-                    </MudItem>
-                    <MudItem xs="12">
-                        <MudTextField @bind-Value="form.Description" For="() => form.Description" Label="Work done" Variant="Variant.Outlined"
-                                      Placeholder="e.g. Minor service: oil, filter and safety check" />
-                    </MudItem>
-                    <MudItem xs="12">
-                        <MudTextField @bind-Value="form.Workshop" For="() => form.Workshop" Label="Workshop or supplier" Variant="Variant.Outlined" />
-                    </MudItem>
-                    <MudItem xs="12" sm="6">
-                        <MudDatePicker @bind-Date="form.NextServiceDueDate" For="() => form.NextServiceDueDate" Label="Next service due (optional)"
-                                       Variant="Variant.Outlined" DateFormat="dd MMM yyyy" Editable="true" Clearable="true" />
-                    </MudItem>
-                    <MudItem xs="12" sm="6" Class="d-flex align-center gap-2 flex-wrap">
-                        <MudText Typo="Typo.caption" Class="mud-text-secondary">Quick pick:</MudText>
-                        @foreach (var months in new[] { 3, 6, 12 })
+
+                    <section>
+                        <MudText Typo="Typo.subtitle2" Class="ft-section-title">What was done</MudText>
+                        <MudGrid Spacing="2">
+                            <MudItem xs="12" sm="6">
+                                <MudDatePicker @bind-Date="form.ServiceDate" For="() => form.ServiceDate" Label="Date" Variant="Variant.Outlined"
+                                               DateFormat="dd MMM yyyy" Editable="true" MaxDate="DateTime.Today" />
+                            </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudSelect T="WorkType" @bind-Value="form.WorkType" Label="Type of work" Variant="Variant.Outlined">
+                                    @foreach (var type in Enum.GetValues<WorkType>())
+                                    {
+                                        <MudSelectItem Value="type">@DisplayNames.Of(type)</MudSelectItem>
+                                    }
+                                </MudSelect>
+                            </MudItem>
+                            <MudItem xs="12">
+                                <MudTextField @bind-Value="form.Description" For="() => form.Description" Label="Work done" Variant="Variant.Outlined"
+                                              Placeholder="e.g. Yearly service: oil, filters and safety check" />
+                            </MudItem>
+                            <MudItem xs="12">
+                                <MudTextField @bind-Value="form.Workshop" For="() => form.Workshop" Label="Workshop or supplier" Variant="Variant.Outlined" />
+                            </MudItem>
+                        </MudGrid>
+                    </section>
+
+                    <section>
+                        <MudText Typo="Typo.subtitle2" Class="ft-section-title">Cost and odometer</MudText>
+                        <MudGrid Spacing="2">
+                            <MudItem xs="6">
+                                <MudNumericField @bind-Value="form.Cost" For="() => form.Cost" Label="Cost" Variant="Variant.Outlined"
+                                                 Adornment="Adornment.Start" AdornmentText="R" HideSpinButtons="true" Format="0.00" />
+                            </MudItem>
+                            <MudItem xs="6">
+                                <MudNumericField @bind-Value="form.OdometerKm" For="() => form.OdometerKm" Label="Odometer" Variant="Variant.Outlined"
+                                                 Adornment="Adornment.End" AdornmentText="km" HideSpinButtons="true" />
+                            </MudItem>
+                        </MudGrid>
+                    </section>
+
+                    @if (ServiceId is null)
+                    {
+                        <section>
+                            <MudText Typo="Typo.subtitle2" Class="ft-section-title">Invoice <span class="mud-text-secondary">(optional)</span></MudText>
+                            @* SelectedTemplate is empty because the chosen file is already shown next to the button. *@
+                            <MudFileUpload T="IBrowserFile" FilesChanged="OnInvoiceChosen" Accept=".pdf,.jpg,.jpeg,.png" MaximumFileCount="1">
+                                <SelectedTemplate Context="_"></SelectedTemplate>
+                                <CustomContent Context="upload">
+                                    <div class="d-flex align-center gap-3">
+                                        <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Rounded.Receipt"
+                                                   OnClick="upload.OpenFilePickerAsync">@(invoice is null ? "Attach invoice" : "Change")</MudButton>
+                                        <MudText Typo="Typo.body2" Class="mud-text-secondary">
+                                            @(invoice is null ? "PDF, JPG or PNG, up to 10 MB" : $"{invoice.Name} · {DocumentFileRules.FormatSize(invoice.Size)}")
+                                        </MudText>
+                                        @if (invoice is not null)
+                                        {
+                                            <MudIconButton Icon="@Icons.Material.Rounded.Close" Size="Size.Small" OnClick="() => invoice = null" aria-label="Remove invoice" />
+                                        }
+                                    </div>
+                                </CustomContent>
+                            </MudFileUpload>
+                        </section>
+                    }
+
+                    <section>
+                        <MudText Typo="Typo.subtitle2" Class="ft-section-title">Next service</MudText>
+                        @* Booking the next service sets its reminder, so the morning email goes out in time. *@
+                        <MudRadioGroup T="NextServiceBooking" @bind-Value="booking" Class="d-flex flex-column">
+                            <MudRadio Value="NextServiceBooking.SameDateNextYear" Color="Color.Primary">
+                                Same date next year @(form.ServiceDate is { } d ? $"({d.AddYears(1):dd MMM yyyy})" : "")
+                            </MudRadio>
+                            <MudRadio Value="NextServiceBooking.InSixMonths" Color="Color.Primary">In 6 months</MudRadio>
+                            <MudRadio Value="NextServiceBooking.PickADate" Color="Color.Primary">Pick a date</MudRadio>
+                            <MudRadio Value="NextServiceBooking.DontBook" Color="Color.Primary">Don't book</MudRadio>
+                        </MudRadioGroup>
+                        @if (booking == NextServiceBooking.PickADate)
                         {
-                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" OnClick="() => SetNext(months)">+@months months</MudChip>
+                            <MudDatePicker @bind-Date="pickedDate" Label="Next service on" Variant="Variant.Outlined" DateFormat="dd MMM yyyy"
+                                           Editable="true" MinDate="@((form.ServiceDate ?? DateTime.Today).AddDays(1))" Class="mt-2" Style="max-width: 240px" />
                         }
-                    </MudItem>
-                    <MudItem xs="12">
-                        <MudTextField @bind-Value="form.Notes" For="() => form.Notes" Label="Notes (optional)" Variant="Variant.Outlined"
-                                      Lines="2" Sizing="InputSizing.Auto" MaxLines="6" MaxLength="2000" />
-                    </MudItem>
-                </MudGrid>
-                @if (error is not null)
-                {
-                    <MudAlert Severity="Severity.Error" Class="mt-4" Dense="true">@error</MudAlert>
-                }
+                    </section>
+
+                    <MudTextField @bind-Value="form.Notes" For="() => form.Notes" Label="Notes (optional)" Variant="Variant.Outlined"
+                                  Lines="2" Sizing="InputSizing.Auto" MaxLines="6" MaxLength="2000" />
+
+                    @if (error is not null)
+                    {
+                        <MudAlert Severity="Severity.Error" Dense="true">@error</MudAlert>
+                    }
+                </MudStack>
             </EditForm>
         }
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="() => Dialog.Cancel()">Cancel</MudButton>
+        <MudButton OnClick="() => Dialog.Cancel()" Disabled="saving">Cancel</MudButton>
         <MudButton ButtonType="ButtonType.Submit" form="service-form" Variant="Variant.Filled" Color="Color.Primary" Disabled="saving || form is null">
-            @(ServiceId is null ? "Log service" : "Save changes")
+            @(ServiceId is not null ? "Save changes" : MarkAsDone ? "Mark as done" : "Log service")
         </MudButton>
     </DialogActions>
 </MudDialog>
@@ -85,9 +129,15 @@
     /// <summary>Set to edit an existing service record (admins only).</summary>
     [Parameter] public int? ServiceId { get; set; }
 
+    /// <summary>Opened from a "service due" reminder: pre-fills a yearly service and books the next one.</summary>
+    [Parameter] public bool MarkAsDone { get; set; }
+
     private ServiceForm? form;
     private List<VehicleRow> vehicles = [];
     private VehicleRow? selectedVehicle;
+    private IBrowserFile? invoice;
+    private NextServiceBooking booking = NextServiceBooking.SameDateNextYear;
+    private DateTime? pickedDate;
     private string? error;
     private bool saving;
 
@@ -97,11 +147,19 @@
         {
             form = await ServiceLog.GetFormAsync(id);
             if (form is null)
+            {
                 error = "This service record has been deleted.";
+                return;
+            }
+            // Editing keeps whatever next date was set.
+            booking = form.NextServiceDueDate is null ? NextServiceBooking.DontBook : NextServiceBooking.PickADate;
+            pickedDate = form.NextServiceDueDate;
             return;
         }
 
         form = new ServiceForm { VehicleId = VehicleId, ServiceDate = DateTime.Today };
+        if (MarkAsDone)
+            form.Description = "Yearly service";
         if (VehicleId is null)
             vehicles = await Vehicles.ListAsync();
     }
@@ -122,19 +180,59 @@
         form!.VehicleId = vehicle?.Id;
     }
 
-    private void SetNext(int months) =>
-        form!.NextServiceDueDate = (form.ServiceDate ?? DateTime.Today).AddMonths(months);
+    private void OnInvoiceChosen(IBrowserFile? file)
+    {
+        error = null;
+        invoice = file;
+        // A quick check in the browser; the server checks the real file type and size again.
+        if (file is not null && !DocumentFileRules.HasAllowedExtension(file.Name))
+            (error, invoice) = ("The invoice must be a PDF, JPG or PNG.", null);
+        else if (file?.Size > DocumentFileRules.MaxBytes)
+            (error, invoice) = ($"That invoice is {DocumentFileRules.FormatSize(file.Size)}. The limit is 10 MB.", null);
+    }
 
     private async Task SaveAsync()
     {
+        var serviceDate = DateOnly.FromDateTime(form!.ServiceDate!.Value);
+        var next = ServiceRules.NextServiceDate(booking, serviceDate, pickedDate is { } p ? DateOnly.FromDateTime(p) : null);
+        if (booking == NextServiceBooking.PickADate && next is null)
+        {
+            error = "Pick the date of the next service, or choose another option.";
+            return;
+        }
+        form.NextServiceDueDate = next?.ToDateTime(TimeOnly.MinValue);
+
         saving = true;
         error = null;
-        var result = ServiceId is { } id ? await ServiceLog.UpdateAsync(id, form!) : await ServiceLog.CreateAsync(form!);
-        saving = false;
+        try
+        {
+            OperationResult result;
+            if (ServiceId is { } id)
+            {
+                result = await ServiceLog.UpdateAsync(id, form);
+            }
+            else if (invoice is not null)
+            {
+                await using var stream = invoice.OpenReadStream(DocumentFileRules.MaxBytes);
+                result = await ServiceLog.CreateAsync(form, new InvoiceUpload(stream, invoice.Name));
+            }
+            else
+            {
+                result = await ServiceLog.CreateAsync(form);
+            }
 
-        if (result.Succeeded)
-            Dialog.Close();
-        else
-            error = result.Error;
+            if (result.Succeeded)
+                Dialog.Close(DialogResult.Ok(next));
+            else
+                error = result.Error;
+        }
+        catch (IOException)
+        {
+            error = "The invoice upload was interrupted. Please try again.";
+        }
+        finally
+        {
+            saving = false;
+        }
     }
 }

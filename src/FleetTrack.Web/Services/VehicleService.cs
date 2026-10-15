@@ -206,11 +206,15 @@ public class VehicleService(
 
         // Note the stored files first: once the rows are gone we no longer know their names.
         var storedFiles = await db.VehicleDocuments.Where(d => d.VehicleId == id).Select(d => d.StoredFileName).ToListAsync();
+        storedFiles.AddRange(await db.ServiceRecords
+            .Where(s => s.VehicleId == id && s.InvoiceStoredFileName != null)
+            .Select(s => s.InvoiceStoredFileName!)
+            .ToListAsync());
 
         db.Vehicles.Remove(vehicle);
         await db.SaveChangesAsync();
 
-        // The ID copies themselves must go too, not just the database rows.
+        // The ID copies and invoices themselves must go too, not just the database rows.
         documents.DeleteFiles(storedFiles);
         return OperationResult.Ok;
     }

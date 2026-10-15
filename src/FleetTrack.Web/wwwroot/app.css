@@ -348,3 +348,9 @@ h1:focus {
 .ft-month-expired .ft-month-name {
     color: var(--mud-palette-error);
 }
+
+/* Section headings inside forms, e.g. "What was done", "Next service" */
+.ft-section-title {
+    font-weight: 600;
+    margin-bottom: 8px;
+}

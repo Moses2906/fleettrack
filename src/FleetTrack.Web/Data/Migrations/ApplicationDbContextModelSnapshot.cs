@@ -348,6 +348,30 @@ namespace FleetTrack.Web.Data.Migrations
                         .HasColumnType("NVARCHAR2(250)")
                         .HasColumnName("DESCRIPTION");
 
+                    b.Property<string>("InvoiceContentType")
+                        .HasMaxLength(50)
+                        .HasColumnType("NVARCHAR2(50)")
+                        .HasColumnName("INVOICE_CONTENT_TYPE");
+
+                    b.Property<string>("InvoiceFileName")
+                        .HasMaxLength(255)
+                        .HasColumnType("NVARCHAR2(255)")
+                        .HasColumnName("INVOICE_FILE_NAME");
+
+                    b.Property<long?>("InvoiceFileSizeBytes")
+                        .HasColumnType("NUMBER(19)")
+                        .HasColumnName("INVOICE_FILE_SIZE_BYTES");
+
+                    b.Property<string>("InvoiceSha256")
+                        .HasMaxLength(64)
+                        .HasColumnType("NVARCHAR2(64)")
+                        .HasColumnName("INVOICE_SHA256");
+
+                    b.Property<string>("InvoiceStoredFileName")
+                        .HasMaxLength(64)
+                        .HasColumnType("NVARCHAR2(64)")
+                        .HasColumnName("INVOICE_STORED_FILE_NAME");
+
                     b.Property<DateTime?>("NextServiceDueDate")
                         .HasColumnType("DATE")
                         .HasColumnName("NEXT_SERVICE_DUE_DATE");

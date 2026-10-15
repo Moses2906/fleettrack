@@ -24,7 +24,8 @@ internal sealed class AuditEntryBuilder
     ];
 
     // Free text could contain names or ID numbers; an uploaded file name could be "Thabo Mokoena ID.pdf".
-    private static readonly HashSet<string> SensitiveProperties = ["Notes", nameof(VehicleDocument.OriginalFileName)];
+    private static readonly HashSet<string> SensitiveProperties =
+        ["Notes", nameof(VehicleDocument.OriginalFileName), nameof(ServiceRecord.InvoiceFileName)];
 
     // Bookkeeping columns that change on every save and would only add noise.
     private static readonly HashSet<string> IgnoredProperties =

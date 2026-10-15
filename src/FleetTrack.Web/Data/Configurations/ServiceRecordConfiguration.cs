@@ -15,5 +15,11 @@ public class ServiceRecordConfiguration : IEntityTypeConfiguration<ServiceRecord
         builder.Property(s => s.CreatedBy).HasMaxLength(256).IsRequired();
 
         builder.HasIndex(s => new { s.VehicleId, s.ServiceDate });
+
+        builder.Property(s => s.InvoiceFileName).HasMaxLength(255);
+        builder.Property(s => s.InvoiceStoredFileName).HasMaxLength(64);
+        builder.Property(s => s.InvoiceContentType).HasMaxLength(50);
+        builder.Property(s => s.InvoiceSha256).HasMaxLength(64);
+        builder.Ignore(s => s.HasInvoice);
     }
 }

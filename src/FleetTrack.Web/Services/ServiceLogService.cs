@@ -2,6 +2,7 @@ using FleetTrack.Core.Entities;
 using FleetTrack.Core.Rules;
 using FleetTrack.Core.Security;
 using FleetTrack.Web.Data;
+using FleetTrack.Web.Documents;
 using FleetTrack.Web.Security;
 using Microsoft.EntityFrameworkCore;
 
@@ -19,7 +20,14 @@ public record ServiceRow(
     decimal Cost,
     string? Notes,
     DateOnly? NextServiceDueDate,
-    string CreatedBy);
+    string CreatedBy,
+    string? InvoiceFileName)
+{
+    public bool HasInvoice => InvoiceFileName is not null;
+}
+
+/// <summary>An invoice chosen in the browser, not yet checked.</summary>
+public record InvoiceUpload(Stream Content, string FileName);
 
 public record ServiceReminderRow(
     int VehicleId,
@@ -37,7 +45,10 @@ public class ServiceLogService(
     IDbContextFactory<ApplicationDbContext> dbFactory,
     PermissionService permissions,
     CurrentUserService currentUser,
-    TimeProvider clock)
+    IDocumentStorage storage,
+    AuditService audit,
+    TimeProvider clock,
+    ILogger<ServiceLogService> logger)
 {
     public DateOnly Today => SouthAfricanTime.Today(clock);
 
@@ -53,7 +64,8 @@ public class ServiceLogService(
         return await query
             .OrderByDescending(s => s.ServiceDate).ThenByDescending(s => s.Id)
             .Select(s => new ServiceRow(s.Id, s.VehicleId, s.Vehicle.RegistrationNumber, s.ServiceDate, s.OdometerKm, s.WorkType,
-                s.Description, s.Workshop, s.Cost, s.Notes, s.NextServiceDueDate, s.CreatedBy))
+                s.Description, s.Workshop, s.Cost, s.Notes, s.NextServiceDueDate, s.CreatedBy,
+                s.InvoiceStoredFileName == null ? null : s.InvoiceFileName))
             .ToListAsync();
     }
 
@@ -102,13 +114,22 @@ public class ServiceLogService(
         };
     }
 
-    /// <summary>Logs a service or repair. Staff may do this too.</summary>
-    public async Task<OperationResult> CreateAsync(ServiceForm form)
+    /// <summary>Logs a service or repair, optionally with its invoice. Staff may do this too.</summary>
+    public async Task<OperationResult> CreateAsync(ServiceForm form, InvoiceUpload? invoice = null)
     {
         await permissions.DemandAsync(Permission.AddServiceRecords);
         await using var db = await dbFactory.CreateDbContextAsync();
         if (await ValidateAsync(db, form, exceptId: null) is { } error)
             return OperationResult.Fail(error);
+
+        // Check the invoice before saving anything, so a bad file doesn't leave a half-saved service.
+        UploadedFile? file = null;
+        if (invoice is not null)
+        {
+            (file, var fileError) = await UploadedFile.ReadAsync(invoice.Content, invoice.FileName);
+            if (file is null)
+                return OperationResult.Fail($"Invoice: {fileError}");
+        }
 
         var record = new ServiceRecord
         {
@@ -117,9 +138,107 @@ public class ServiceLogService(
             CreatedBy = (await currentUser.GetActorAsync()).UserName ?? "unknown",
         };
         Apply(form, record);
+        if (file is not null)
+            await AttachAsync(record, file);
         db.ServiceRecords.Add(record);
-        await db.SaveChangesAsync();
+        try
+        {
+            await db.SaveChangesAsync();
+        }
+        catch
+        {
+            // The database didn't take the record, so don't leave its invoice file behind.
+            if (record.InvoiceStoredFileName is { } stored)
+                storage.Delete(stored);
+            throw;
+        }
         return OperationResult.Created(record.Id);
+    }
+
+    /// <summary>Adds or replaces the invoice on an existing service (admin: it changes a logged record).</summary>
+    public async Task<OperationResult> AttachInvoiceAsync(int serviceId, InvoiceUpload invoice)
+    {
+        await permissions.DemandAsync(Permission.EditRecords);
+        var (file, error) = await UploadedFile.ReadAsync(invoice.Content, invoice.FileName);
+        if (file is null)
+            return OperationResult.Fail(error!);
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var record = await db.ServiceRecords.FindAsync(serviceId);
+        if (record is null)
+            return OperationResult.Fail("This service record has been deleted.");
+
+        var oldFile = record.InvoiceStoredFileName;
+        await AttachAsync(record, file);
+        await db.SaveChangesAsync();
+        if (oldFile is not null)
+            TryDelete(oldFile);
+        return OperationResult.Ok;
+    }
+
+    public async Task<OperationResult> RemoveInvoiceAsync(int serviceId)
+    {
+        await permissions.DemandAsync(Permission.DeleteRecords);
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var record = await db.ServiceRecords.FindAsync(serviceId);
+        if (record?.InvoiceStoredFileName is not { } stored)
+            return OperationResult.Ok;
+
+        record.InvoiceFileName = record.InvoiceStoredFileName = record.InvoiceContentType = record.InvoiceSha256 = null;
+        record.InvoiceFileSizeBytes = null;
+        await db.SaveChangesAsync();
+        TryDelete(stored);
+        return OperationResult.Ok;
+    }
+
+    /// <summary>Returns a service's invoice for viewing or downloading, or null if there is none or it fails its check.</summary>
+    public async Task<FleetTrack.Web.Documents.DocumentFile?> OpenInvoiceAsync(int serviceId, bool download)
+    {
+        await permissions.DemandAsync(Permission.ViewRecords);
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var record = await db.ServiceRecords.AsNoTracking().SingleOrDefaultAsync(s => s.Id == serviceId);
+        if (record?.InvoiceStoredFileName is not { } stored)
+            return null;
+
+        byte[] content;
+        try
+        {
+            content = await storage.ReadAsync(stored);
+        }
+        catch (FileNotFoundException)
+        {
+            logger.LogError("Invoice for service {ServiceId} is missing from storage.", serviceId);
+            return null;
+        }
+        if (!UploadedFile.MatchesFingerprint(content, record.InvoiceSha256!))
+        {
+            logger.LogError("Invoice for service {ServiceId} failed its integrity check.", serviceId);
+            return null;
+        }
+
+        await audit.LogAsync(download ? AuditAction.Download : AuditAction.View, "ServiceInvoice", serviceId.ToString());
+        return new FleetTrack.Web.Documents.DocumentFile(content, record.InvoiceContentType!, record.InvoiceFileName!);
+    }
+
+    private async Task AttachAsync(ServiceRecord record, UploadedFile file)
+    {
+        record.InvoiceStoredFileName = await storage.SaveAsync(new MemoryStream(file.Content));
+        record.InvoiceFileName = file.FileName;
+        record.InvoiceContentType = file.ContentType;
+        record.InvoiceFileSizeBytes = file.Size;
+        record.InvoiceSha256 = file.Sha256;
+    }
+
+    private void TryDelete(string storedName)
+    {
+        try
+        {
+            storage.Delete(storedName);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            logger.LogWarning(ex, "Couldn't delete stored invoice file {StoredName}.", storedName);
+        }
     }
 
     /// <summary>Correcting a logged service is an admin task.</summary>
@@ -149,6 +268,8 @@ public class ServiceLogService(
         {
             db.ServiceRecords.Remove(record);
             await db.SaveChangesAsync();
+            if (record.InvoiceStoredFileName is { } stored)
+                TryDelete(stored);
         }
         return OperationResult.Ok;
     }
