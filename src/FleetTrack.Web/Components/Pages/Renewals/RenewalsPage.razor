@@ -10,6 +10,33 @@
 
 <PageHeader Title="Licence renewals" Subtitle="Disks to renew, and what happened after each new disk was bought." />
 
+@if (outlook is not null)
+{
+    <MudPaper Outlined="true" Elevation="0" Class="pa-4 mb-4">
+        <div class="d-flex flex-wrap align-center justify-space-between gap-2 mb-3">
+            <MudText Typo="Typo.h6">Disks due by month</MudText>
+            <MudText Typo="Typo.caption" Class="mud-text-secondary">Click a month to see which vehicles</MudText>
+        </div>
+        <div class="ft-month-strip">
+            @if (outlook.AlreadyExpired > 0)
+            {
+                <a class="ft-month ft-month-expired" href="vehicles?status=expired">
+                    <span class="ft-month-name">Expired</span>
+                    <span class="ft-month-count">@outlook.AlreadyExpired</span>
+                </a>
+            }
+            @foreach (var m in outlook.Months)
+            {
+                <a class="ft-month @(m.Count == 0 ? "ft-month-empty" : "")" href="@($"vehicles?month={m.Month}")"
+                   aria-label="@($"{m.Count} disk(s) expiring in {m.Month.Display}")">
+                    <span class="ft-month-name">@m.Month.ShortDisplay</span>
+                    <span class="ft-month-count">@m.Count</span>
+                </a>
+            }
+        </div>
+    </MudPaper>
+}
+
 <MudGrid Spacing="4">
     <MudItem xs="12" lg="5">
         <MudPaper Outlined="true" Elevation="0">
@@ -77,6 +104,7 @@
 
 @code {
     private List<VehicleRow>? toRenew;
+    private ExpiryOutlook? outlook;
     private List<RenewalRow>? renewals;
     private DateOnly today;
     private bool outstandingOnly;
@@ -96,7 +124,9 @@
 
     private async Task LoadAsync()
     {
-        toRenew = (await Vehicles.ListAsync())
+        var all = await Vehicles.ListAsync();
+        outlook = ExpiryCalendar.ByMonth(all.Select(v => v.LicenceExpiryDate), today);
+        toRenew = all
             .Where(v => v.StatusOn(today) != LicenceStatus.Valid)
             .OrderBy(v => v.LicenceExpiryDate)
             .ToList();

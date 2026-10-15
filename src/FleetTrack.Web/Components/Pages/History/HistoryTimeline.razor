@@ -1,0 +1,57 @@
+@* The timeline of renewals and services, shared by the "by vehicle" and "by month" views. *@
+@if (!Entries.Any())
+{
+    <EmptyState Icon="@Icons.Material.Rounded.History" Title="@EmptyTitle" />
+}
+else
+{
+    <MudTimeline TimelineOrientation="TimelineOrientation.Vertical" TimelinePosition="TimelinePosition.Start" Class="ft-timeline">
+        @foreach (var entry in Entries)
+        {
+            var isRenewal = entry.Kind == HistoryEntryKind.Renewal;
+            <MudTimelineItem Color="@(isRenewal ? Color.Primary : Color.Success)" Size="Size.Small" Variant="Variant.Filled">
+                <ItemDot><MudIcon Icon="@(isRenewal ? Icons.Material.Rounded.Autorenew : Icons.Material.Rounded.Build)" Size="Size.Small" /></ItemDot>
+                <ItemContent>
+                    <div class="d-flex flex-wrap justify-space-between gap-2">
+                        <div>
+                            <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                @entry.Date.ToString("dddd d MMMM yyyy")
+                                @if (ShowVehicle)
+                                {
+                                    <span> · </span>
+                                    <MudLink Href="@($"vehicles/{entry.VehicleId}")" Typo="Typo.caption" Class="ft-reg" Underline="Underline.Hover">@entry.RegistrationNumber</MudLink>
+                                }
+                            </MudText>
+                            <MudText Typo="Typo.subtitle1"><b>@entry.Title</b></MudText>
+                            <MudText Typo="Typo.body2" Class="mud-text-secondary">@entry.Summary</MudText>
+                            @foreach (var followUp in entry.FollowUps)
+                            {
+                                <MudText Typo="Typo.caption" Class="d-block mud-text-secondary">• @followUp</MudText>
+                            }
+                            @if (entry.Notes is not null)
+                            {
+                                <MudText Typo="Typo.caption" Class="d-block mud-text-secondary" Style="white-space: pre-line"><i>@entry.Notes</i></MudText>
+                            }
+                        </div>
+                        <div class="text-right">
+                            <MudText Typo="Typo.body2"><b>@DisplayNames.Money(entry.Amount)</b></MudText>
+                            @if (entry.OdometerKm is { } km)
+                            {
+                                <MudText Typo="Typo.caption" Class="mud-text-secondary">@km.ToString("#,##0") km</MudText>
+                            }
+                        </div>
+                    </div>
+                </ItemContent>
+            </MudTimelineItem>
+        }
+    </MudTimeline>
+}
+
+@code {
+    [Parameter, EditorRequired] public IEnumerable<HistoryEntry> Entries { get; set; } = [];
+
+    /// <summary>Show each entry's registration number (for the whole-fleet month view).</summary>
+    [Parameter] public bool ShowVehicle { get; set; }
+
+    [Parameter] public string EmptyTitle { get; set; } = "Nothing recorded in this period";
+}

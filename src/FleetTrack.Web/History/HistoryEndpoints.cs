@@ -9,7 +9,10 @@ namespace FleetTrack.Web.History;
 
 public static class HistoryEndpoints
 {
-    /// <summary>GET /history/{vehicleId}/pdf?years=5 downloads the vehicle's history as a PDF.</summary>
+    /// <summary>
+    /// GET /history/{vehicleId}/pdf?years=5 downloads a vehicle's history as a PDF.
+    /// GET /history/month/2026-11/pdf downloads every vehicle's renewals and services for that month.
+    /// </summary>
     public static void MapHistoryEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet("/history/{vehicleId:int}/pdf", async (int vehicleId, int? years, HttpContext context,
@@ -30,6 +33,25 @@ public static class HistoryEndpoints
             context.Response.Headers.CacheControl = "no-store, private";
             var fileName = $"FleetTrack-history-{RegistrationNumbers.ToKey(report.Vehicle.Row.RegistrationNumber)}-{now:yyyy-MM-dd}.pdf";
             return Results.File(pdf, "application/pdf", fileName);
+        })
+        .RequireAuthorization(nameof(Permission.ViewRecords));
+
+        endpoints.MapGet("/history/month/{month}/pdf", async (string month, HttpContext context,
+            HistoryService history, CurrentUserService currentUser, AuditService audit, TimeProvider clock) =>
+        {
+            if (!YearMonth.TryParse(month, out var yearMonth))
+                return Results.BadRequest();
+
+            var report = await history.GetMonthAsync(yearMonth);
+            var user = await currentUser.GetPrincipalAsync();
+            var now = SouthAfricanTime.ToLocal(clock.GetUtcNow().UtcDateTime);
+            var pdf = HistoryPdf.GenerateMonthly(report, user.DisplayName(), now);
+
+            await audit.LogAsync(AuditAction.Export, "Fleet", null,
+                JsonSerializer.Serialize(new { Report = "MonthlyHistory", Month = yearMonth.ToString() }));
+
+            context.Response.Headers.CacheControl = "no-store, private";
+            return Results.File(pdf, "application/pdf", $"FleetTrack-month-{yearMonth}.pdf");
         })
         .RequireAuthorization(nameof(Permission.ViewRecords));
     }

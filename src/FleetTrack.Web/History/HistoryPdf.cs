@@ -23,11 +23,23 @@ public static class HistoryPdf
         QuestPDF.Settings.License = LicenseType.Community;
     }
 
+    /// <summary>One vehicle's renewals and services.</summary>
     public static byte[] Generate(VehicleHistory history, string generatedBy, DateTime generatedAtLocal)
     {
         var v = history.Vehicle.Row;
         var status = LicenceStatusRules.GetStatus(v.LicenceExpiryDate, history.To);
+        return Build("Vehicle history report", v.RegistrationNumber, $"Vehicle history {v.RegistrationNumber}", history,
+            generatedBy, generatedAtLocal, summary: c => ComposeVehicleSummary(c, history, status), showVehicle: false);
+    }
 
+    /// <summary>Every vehicle's renewals and services in one month.</summary>
+    public static byte[] GenerateMonthly(MonthlyHistory history, string generatedBy, DateTime generatedAtLocal) =>
+        Build("Monthly fleet report", history.Month.Display, $"Fleet history {history.Month.Display}", history,
+            generatedBy, generatedAtLocal, summary: null, showVehicle: true);
+
+    private static byte[] Build(string reportName, string headline, string title, HistoryBase history,
+        string generatedBy, DateTime generatedAtLocal, Action<IContainer>? summary, bool showVehicle)
+    {
         return Document.Create(document =>
         {
             document.Page(page =>
@@ -36,13 +48,14 @@ public static class HistoryPdf
                 page.Margin(1.6f, Unit.Centimetre);
                 page.DefaultTextStyle(t => t.FontSize(9.5f).FontColor(Ink).LineHeight(1.35f));
 
-                page.Header().Element(header => ComposeHeader(header, history, generatedBy, generatedAtLocal));
+                page.Header().Element(header => ComposeHeader(header, reportName, headline, generatedBy, generatedAtLocal));
                 page.Content().PaddingVertical(14).Column(column =>
                 {
                     column.Spacing(16);
-                    column.Item().Element(c => ComposeVehicleSummary(c, history, status));
+                    if (summary is not null)
+                        column.Item().Element(summary);
                     column.Item().Element(c => ComposeTotals(c, history));
-                    column.Item().Element(c => ComposeTimeline(c, history));
+                    column.Item().Element(c => ComposeTimeline(c, history, showVehicle));
                 });
                 page.Footer().Row(row =>
                 {
@@ -61,14 +74,14 @@ public static class HistoryPdf
         })
         .WithMetadata(new DocumentMetadata
         {
-            Title = $"Vehicle history {v.RegistrationNumber}",
+            Title = title,
             Author = "FleetTrack",
             Subject = $"Licence renewals and services {history.From:dd MMM yyyy} to {history.To:dd MMM yyyy}",
         })
         .GeneratePdf();
     }
 
-    private static void ComposeHeader(IContainer container, VehicleHistory history, string generatedBy, DateTime generatedAtLocal)
+    private static void ComposeHeader(IContainer container, string reportName, string headline, string generatedBy, DateTime generatedAtLocal)
     {
         container.BorderBottom(1).BorderColor(Line).PaddingBottom(10).Row(row =>
         {
@@ -80,12 +93,12 @@ public static class HistoryPdf
                 brand.RelativeItem().AlignMiddle().Column(c =>
                 {
                     c.Item().Text("FleetTrack").Bold().FontSize(12);
-                    c.Item().Text("Vehicle history report").FontColor(Muted).FontSize(8.5f);
+                    c.Item().Text(reportName).FontColor(Muted).FontSize(8.5f);
                 });
             });
             row.AutoItem().AlignRight().Column(c =>
             {
-                c.Item().AlignRight().Text(history.Vehicle.Row.RegistrationNumber).Bold().FontSize(16);
+                c.Item().AlignRight().Text(headline).Bold().FontSize(16);
                 c.Item().AlignRight().Text($"Generated {generatedAtLocal:dd MMM yyyy HH:mm} by {generatedBy}").FontColor(Muted).FontSize(7.5f);
             });
         });
@@ -149,7 +162,7 @@ public static class HistoryPdf
         });
     }
 
-    private static void ComposeTotals(IContainer container, VehicleHistory history)
+    private static void ComposeTotals(IContainer container, HistoryBase history)
     {
         container.Row(row =>
         {
@@ -167,7 +180,7 @@ public static class HistoryPdf
             });
     }
 
-    private static void ComposeTimeline(IContainer container, VehicleHistory history)
+    private static void ComposeTimeline(IContainer container, HistoryBase history, bool showVehicle)
     {
         container.Column(column =>
         {
@@ -184,6 +197,8 @@ public static class HistoryPdf
                 table.ColumnsDefinition(columns =>
                 {
                     columns.ConstantColumn(62);   // date
+                    if (showVehicle)
+                        columns.ConstantColumn(68); // vehicle
                     columns.ConstantColumn(58);   // type
                     columns.RelativeColumn();     // details
                     columns.ConstantColumn(62);   // odometer
@@ -192,7 +207,10 @@ public static class HistoryPdf
 
                 table.Header(header =>
                 {
-                    foreach (var (text, right) in new[] { ("Date", false), ("Type", false), ("Details", false), ("Odometer", true), ("Amount", true) })
+                    var headings = showVehicle
+                        ? new[] { ("Date", false), ("Vehicle", false), ("Type", false), ("Details", false), ("Odometer", true), ("Amount", true) }
+                        : new[] { ("Date", false), ("Type", false), ("Details", false), ("Odometer", true), ("Amount", true) };
+                    foreach (var (text, right) in headings)
                     {
                         var cell = header.Cell().BorderBottom(1).BorderColor(Line).PaddingVertical(5);
                         (right ? cell.AlignRight() : cell).Text(text).FontColor(Muted).SemiBold().FontSize(8.5f);
@@ -206,6 +224,8 @@ public static class HistoryPdf
                     IContainer Cell() => table.Cell().Background(background).BorderBottom(0.5f).BorderColor(Line).PaddingVertical(6).PaddingHorizontal(3);
 
                     Cell().Text(entry.Date.ToString("dd MMM yyyy"));
+                    if (showVehicle)
+                        Cell().Text(entry.RegistrationNumber).SemiBold();
                     Cell().Text(entry.Kind == HistoryEntryKind.Renewal ? "Renewal" : "Service")
                         .FontColor(entry.Kind == HistoryEntryKind.Renewal ? Primary : "#0F766E").SemiBold();
                     Cell().Column(details =>

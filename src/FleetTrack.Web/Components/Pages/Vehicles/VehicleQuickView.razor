@@ -1,0 +1,111 @@
+@* What a vehicle row shows when it's expanded: the details, the full checklist and quick actions.
+   The details are loaded only when the row is opened, so the list itself stays fast. *@
+@inject VehicleService Vehicles
+@inject PermissionService Permissions
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+
+<div class="ft-quickview">
+    @if (details is null)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else
+    {
+        var v = Row;
+        <MudGrid Spacing="3">
+            <MudItem xs="12" sm="6" md="3">
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">Licensed to</MudText>
+                <MudText Typo="Typo.body2"><b>@v.LicenceHolder</b></MudText>
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                    @(details.HolderType == HolderType.Company ? "Reg. no." : "ID") @details.HolderIdentifierForDisplay
+                </MudText>
+            </MudItem>
+            <MudItem xs="6" sm="3" md="2">
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">Category</MudText>
+                <MudText Typo="Typo.body2">@v.Category</MudText>
+            </MudItem>
+            <MudItem xs="6" sm="3" md="2">
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">Year · VIN</MudText>
+                <MudText Typo="Typo.body2">@(v.Year?.ToString() ?? "—") · @(details.Vin ?? "no VIN")</MudText>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="2">
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">Driver</MudText>
+                <MudText Typo="Typo.body2">@(v.Driver ?? "Unassigned")</MudText>
+                @if (details.DriverPhone is not null)
+                {
+                    <MudLink Href="@($"tel:{details.DriverPhone.Replace(" ", "")}")" Typo="Typo.caption">@details.DriverPhone</MudLink>
+                }
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">Documents</MudText>
+                <div class="mt-1"><DocumentChecklist HasRc1="v.HasRc1" HasBrnc="v.HasBrnc" HasProxyLetter="v.HasProxyLetter" HasProxyId="v.HasProxyId" /></div>
+            </MudItem>
+            @if (details.Notes is not null)
+            {
+                <MudItem xs="12">
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">Notes</MudText>
+                    <MudText Typo="Typo.body2" Style="white-space: pre-line">@details.Notes</MudText>
+                </MudItem>
+            }
+        </MudGrid>
+
+        <div class="d-flex flex-wrap gap-2 mt-3">
+            <MudButton Href="@($"vehicles/{v.Id}")" Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Rounded.OpenInNew">Open vehicle</MudButton>
+            <MudButton Href="@($"vehicles/{v.Id}?tab=documents")" Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Rounded.Description">Documents</MudButton>
+            <MudButton Href="@($"history?vehicle={v.Id}")" Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Rounded.ManageSearch">History</MudButton>
+            @if (canEdit)
+            {
+                <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Rounded.Edit" OnClick="EditAsync">Edit</MudButton>
+                @if (v.StatusOn(Today) != LicenceStatus.Valid)
+                {
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Rounded.Autorenew" OnClick="RenewAsync">Renew disk</MudButton>
+                }
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public VehicleRow Row { get; set; } = default!;
+    [Parameter, EditorRequired] public DateOnly Today { get; set; }
+
+    /// <summary>Raised after an edit or renewal, so the list can refresh.</summary>
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private VehicleDetails? details;
+    private bool canEdit;
+
+    protected override async Task OnInitializedAsync()
+    {
+        canEdit = await Permissions.HasAsync(Permission.EditRecords);
+        details = await Vehicles.GetAsync(Row.Id);
+    }
+
+    private async Task EditAsync()
+    {
+        var dialog = await Dialogs.ShowAsync<VehicleDialog>("Edit vehicle", new DialogParameters<VehicleDialog> { { d => d.VehicleId, Row.Id } },
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        if ((await dialog.Result) is { Canceled: false })
+        {
+            Snackbar.Add("Vehicle updated.", Severity.Success);
+            await OnChanged.InvokeAsync();
+        }
+    }
+
+    private async Task RenewAsync()
+    {
+        var dialog = await Dialogs.ShowAsync<FleetTrack.Web.Components.Pages.Renewals.RenewalDialog>($"Renew {Row.RegistrationNumber}",
+            new DialogParameters<FleetTrack.Web.Components.Pages.Renewals.RenewalDialog>
+            {
+                { d => d.VehicleId, Row.Id },
+                { d => d.CurrentExpiry, Row.LicenceExpiryDate },
+            },
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        if ((await dialog.Result) is { Canceled: false })
+        {
+            Snackbar.Add($"{Row.RegistrationNumber} renewed.", Severity.Success);
+            await OnChanged.InvokeAsync();
+        }
+    }
+}
