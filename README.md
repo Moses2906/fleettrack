@@ -171,7 +171,7 @@ flowchart LR
 ```bash
 git clone https://github.com/Moses2906/fleettrack.git
 cd fleettrack
-cp .env.example .env
+cp .env.example .env        # Windows: copy .env.example .env
 ```
 
 Edit `.env` and choose two passwords. The file is git-ignored.
@@ -187,10 +187,10 @@ This runs Oracle Database 23ai Free (creating an application user called `fleett
 
 ### 3. Give the app its connection string (kept out of source code)
 
+Replace `YOUR_APP_PASSWORD` with the `ORACLE_APP_PASSWORD` you chose in `.env` (one line; works in Terminal, PowerShell and Command Prompt):
+
 ```bash
-dotnet user-secrets set "ConnectionStrings:DefaultConnection" \
-  "User Id=fleettrack;Password=<ORACLE_APP_PASSWORD from .env>;Data Source=localhost:1521/FREEPDB1" \
-  --project src/FleetTrack.Web
+dotnet user-secrets set "ConnectionStrings:DefaultConnection" "User Id=fleettrack;Password=YOUR_APP_PASSWORD;Data Source=localhost:1521/FREEPDB1" --project src/FleetTrack.Web
 ```
 
 ### 4. Run
