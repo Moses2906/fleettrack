@@ -54,6 +54,7 @@ internal sealed class TestServices : IAsyncDisposable
         services.AddScoped<ReferenceDataService>();
         services.AddScoped<ServiceLogService>();
         services.AddScoped<RenewalService>();
+        services.AddScoped<FleetTrack.Web.History.HistoryService>();
         services.AddScoped<AuditService>();
         var storagePath = shareWith?.StoragePath ?? Path.Combine(Path.GetTempPath(), "fleettrack-tests", Guid.NewGuid().ToString("N"));
         services.AddSingleton<IDocumentStorage>(new LocalDocumentStorage(storagePath));

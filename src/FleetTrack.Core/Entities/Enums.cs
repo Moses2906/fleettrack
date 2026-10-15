@@ -42,5 +42,6 @@ public enum AuditAction
     Update,
     Delete,
     View,
-    Download
+    Download,
+    Export
 }

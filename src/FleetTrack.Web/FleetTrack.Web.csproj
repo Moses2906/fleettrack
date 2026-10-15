@@ -19,6 +19,7 @@
     </PackageReference>
     <PackageReference Include="MudBlazor" Version="9.11.0" />
     <PackageReference Include="Oracle.EntityFrameworkCore" Version="10.23.26301" />
+    <PackageReference Include="QuestPDF" Version="2026.9.1" />
   </ItemGroup>
 
   <ItemGroup>

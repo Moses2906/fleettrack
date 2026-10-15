@@ -25,6 +25,7 @@ else
     var v = vehicle.Row;
     <PageHeader Title="@v.RegistrationNumber" Subtitle="@($"{v.MakeAndModel}{(v.Year is null ? "" : $" · {v.Year}")} · {v.Category}")">
         <Actions>
+            <MudButton Href="@($"history?vehicle={v.Id}")" Variant="Variant.Outlined" StartIcon="@Icons.Material.Rounded.ManageSearch">History</MudButton>
             @if (canEdit)
             {
                 <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Rounded.Edit" OnClick="EditAsync">Edit</MudButton>

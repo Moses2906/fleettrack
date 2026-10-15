@@ -241,3 +241,8 @@ h1:focus {
     gap: 8px;
     min-height: 32px;
 }
+
+/* History timeline: hug the left edge instead of MudBlazor's default indent */
+.ft-timeline .mud-timeline-item-content {
+    padding-bottom: 20px;
+}

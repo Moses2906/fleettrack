@@ -1,0 +1,196 @@
+@page "/history"
+@attribute [Authorize(Policy = nameof(Permission.ViewRecords))]
+@inject HistoryService History
+@inject VehicleService Vehicles
+@inject NavigationManager Navigation
+
+<PageTitle>@(history is null ? "Vehicle history" : $"History {history.Vehicle.Row.RegistrationNumber}") · FleetTrack</PageTitle>
+
+<PageHeader Title="Vehicle history" Subtitle="Search a registration number to see every licence renewal and service, newest first." />
+
+<MudPaper Outlined="true" Elevation="0" Class="pa-4 mb-4">
+    <MudGrid Spacing="2">
+        <MudItem xs="12" md="6">
+            <MudAutocomplete T="VehicleRow" Value="selected" ValueChanged="SelectAsync" SearchFunc="Search"
+                             ToStringFunc="@(v => v is null ? "" : $"{v.RegistrationNumber} · {v.MakeAndModel}")"
+                             Placeholder="Registration number, e.g. CA 482-913" Variant="Variant.Outlined" Margin="Margin.Dense"
+                             Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Rounded.Search" ResetValueOnEmptyText="true"
+                             AutoFocus="@(VehicleId is null)" MaxItems="20" />
+        </MudItem>
+        @if (history is not null)
+        {
+            <MudItem xs="12" md="6" Class="d-flex flex-wrap align-center justify-md-end gap-2">
+                <MudChipSet T="int" SelectedValue="years" SelectedValueChanged="YearsChangedAsync" SelectionMode="SelectionMode.SingleSelection" CheckMark="false">
+                    @foreach (var y in new[] { 1, 2, 5 })
+                    {
+                        <MudChip T="int" Value="y" Variant="Variant.Outlined" Color="Color.Primary">@(y == 1 ? "1 year" : $"{y} years")</MudChip>
+                    }
+                </MudChipSet>
+                @* A normal link to the PDF endpoint: the server builds the file, checks permissions and logs the export. *@
+                <MudButton Href="@($"history/{history.Vehicle.Row.Id}/pdf?years={years}")" Target="_blank" Variant="Variant.Filled" Color="Color.Primary"
+                           StartIcon="@Icons.Material.Rounded.PictureAsPdf">Export PDF</MudButton>
+            </MudItem>
+        }
+    </MudGrid>
+</MudPaper>
+
+@if (loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (history is null)
+{
+    <MudPaper Outlined="true" Elevation="0">
+        <EmptyState Icon="@Icons.Material.Rounded.ManageSearch" Title="Find a vehicle"
+                    Message="@(notFound ? "That vehicle wasn't found. It may have been deleted." : "Start typing a registration number above.")" />
+    </MudPaper>
+}
+else
+{
+    var v = history.Vehicle.Row;
+    <MudGrid Spacing="4" Class="mb-2">
+        <MudItem xs="12" md="6">
+            <MudPaper Outlined="true" Elevation="0" Class="pa-4 h-100">
+                <div class="d-flex justify-space-between align-start gap-2">
+                    <div>
+                        <MudLink Href="@($"vehicles/{v.Id}")" Typo="Typo.h5" Class="ft-reg" Underline="Underline.Hover">@v.RegistrationNumber</MudLink>
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary">@v.MakeAndModel · @v.Category</MudText>
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary">Licensed to @v.LicenceHolder · Driver @(v.Driver ?? "unassigned")</MudText>
+                    </div>
+                    <LicenceStatusChip ExpiryDate="v.LicenceExpiryDate" Today="history.To" />
+                </div>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="6" md="3">
+            <MudPaper Outlined="true" Elevation="0" Class="pa-4 h-100">
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">Renewals (@history.RenewalCount)</MudText>
+                <MudText Typo="Typo.h5" Class="mt-1">@DisplayNames.Money(history.RenewalTotal)</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="6" md="3">
+            <MudPaper Outlined="true" Elevation="0" Class="pa-4 h-100">
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">Services & repairs (@history.ServiceCount)</MudText>
+                <MudText Typo="Typo.h5" Class="mt-1">@DisplayNames.Money(history.ServiceTotal)</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <MudPaper Outlined="true" Elevation="0" Class="pa-4">
+        <div class="d-flex flex-wrap align-center justify-space-between gap-2 mb-2">
+            <MudText Typo="Typo.h6">@history.From.ToString("dd MMM yyyy") – @history.To.ToString("dd MMM yyyy")</MudText>
+            <MudChipSet T="string" @bind-SelectedValue="kind" SelectionMode="SelectionMode.SingleSelection" CheckMark="false">
+                <MudChip T="string" Value="@("all")" Variant="Variant.Text">All</MudChip>
+                <MudChip T="string" Value="@("renewals")" Variant="Variant.Text">Renewals</MudChip>
+                <MudChip T="string" Value="@("services")" Variant="Variant.Text">Services</MudChip>
+            </MudChipSet>
+        </div>
+        @if (!Visible.Any())
+        {
+            <EmptyState Icon="@Icons.Material.Rounded.History" Title="Nothing recorded in this period" />
+        }
+        else
+        {
+            <MudTimeline TimelineOrientation="TimelineOrientation.Vertical" TimelinePosition="TimelinePosition.Start" Class="ft-timeline">
+                @foreach (var entry in Visible)
+                {
+                    var isRenewal = entry.Kind == HistoryEntryKind.Renewal;
+                    <MudTimelineItem Color="@(isRenewal ? Color.Primary : Color.Success)" Size="Size.Small" Variant="Variant.Filled">
+                        <ItemDot><MudIcon Icon="@(isRenewal ? Icons.Material.Rounded.Autorenew : Icons.Material.Rounded.Build)" Size="Size.Small" /></ItemDot>
+                        <ItemContent>
+                            <div class="d-flex flex-wrap justify-space-between gap-2">
+                                <div>
+                                    <MudText Typo="Typo.caption" Class="mud-text-secondary">@entry.Date.ToString("dddd d MMMM yyyy")</MudText>
+                                    <MudText Typo="Typo.subtitle1"><b>@entry.Title</b></MudText>
+                                    <MudText Typo="Typo.body2" Class="mud-text-secondary">@entry.Summary</MudText>
+                                    @foreach (var followUp in entry.FollowUps)
+                                    {
+                                        <MudText Typo="Typo.caption" Class="d-block mud-text-secondary">• @followUp</MudText>
+                                    }
+                                    @if (entry.Notes is not null)
+                                    {
+                                        <MudText Typo="Typo.caption" Class="d-block mud-text-secondary" Style="white-space: pre-line"><i>@entry.Notes</i></MudText>
+                                    }
+                                </div>
+                                <div class="text-right">
+                                    <MudText Typo="Typo.body2"><b>@DisplayNames.Money(entry.Amount)</b></MudText>
+                                    @if (entry.OdometerKm is { } km)
+                                    {
+                                        <MudText Typo="Typo.caption" Class="mud-text-secondary">@km.ToString("#,##0") km</MudText>
+                                    }
+                                </div>
+                            </div>
+                        </ItemContent>
+                    </MudTimelineItem>
+                }
+            </MudTimeline>
+        }
+    </MudPaper>
+}
+
+@code {
+    /// <summary>/history?vehicle=12 opens a vehicle's history directly (e.g. from its vehicle page).</summary>
+    [SupplyParameterFromQuery(Name = "vehicle")] public int? VehicleId { get; set; }
+
+    private List<VehicleRow> vehicles = [];
+    private VehicleRow? selected;
+    private VehicleHistory? history;
+    private int years = HistoryService.DefaultYears;
+    private string kind = "all";
+    private bool loading;
+    private bool notFound;
+
+    private IEnumerable<HistoryEntry> Visible => (history?.Entries ?? []).Where(e => kind switch
+    {
+        "renewals" => e.Kind == HistoryEntryKind.Renewal,
+        "services" => e.Kind == HistoryEntryKind.Service,
+        _ => true,
+    });
+
+    protected override async Task OnParametersSetAsync()
+    {
+        vehicles = await Vehicles.ListAsync();
+        if (VehicleId is { } id)
+        {
+            selected = vehicles.FirstOrDefault(v => v.Id == id);
+            await LoadAsync(id);
+        }
+    }
+
+    private Task<IEnumerable<VehicleRow>> Search(string? text, CancellationToken _)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return Task.FromResult<IEnumerable<VehicleRow>>(vehicles);
+        var key = RegistrationNumbers.ToKey(text);
+        return Task.FromResult(vehicles.Where(v =>
+            (key.Length > 0 && RegistrationNumbers.ToKey(v.RegistrationNumber).Contains(key))
+            || v.MakeAndModel.Contains(text, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    private Task SelectAsync(VehicleRow? vehicle)
+    {
+        selected = vehicle;
+        if (vehicle is null)
+        {
+            history = null;
+            return Task.CompletedTask;
+        }
+        // Put the vehicle in the address bar, so the page can be bookmarked or shared with a colleague.
+        Navigation.NavigateTo($"history?vehicle={vehicle.Id}");
+        return Task.CompletedTask;
+    }
+
+    private async Task YearsChangedAsync(int value)
+    {
+        years = value == 0 ? HistoryService.DefaultYears : value;
+        if (selected is not null)
+            await LoadAsync(selected.Id);
+    }
+
+    private async Task LoadAsync(int vehicleId)
+    {
+        loading = true;
+        history = await History.GetAsync(vehicleId, years);
+        notFound = history is null;
+        loading = false;
+    }
+}
