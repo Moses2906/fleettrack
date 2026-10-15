@@ -22,7 +22,7 @@
                            Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
                     @foreach (var a in Enum.GetValues<AuditAction>())
                     {
-                        <MudSelectItem T="AuditAction?" Value="a">@a</MudSelectItem>
+                        <MudSelectItem T="AuditAction?" Value="a">@ActionLabel(a)</MudSelectItem>
                     }
                 </MudSelect>
             </MudItem>
@@ -54,7 +54,7 @@
             <MudTd DataLabel="When">@SouthAfricanTime.ToLocal(context.TimestampUtc).ToString("dd MMM yyyy HH:mm")</MudTd>
             <MudTd DataLabel="User">@(context.UserName ?? "unknown")</MudTd>
             <MudTd DataLabel="Action">
-                <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="@ActionColor(context.Action)">@context.Action</MudChip>
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="@ActionColor(context.Action)">@ActionLabel(context.Action)</MudChip>
             </MudTd>
             <MudTd DataLabel="Record">@context.EntityType @(context.EntityId is null ? "" : $"#{Short(context.EntityId)}")</MudTd>
             <MudTd Style="text-align: right">
@@ -127,6 +127,19 @@
 
     // User IDs are long GUIDs; the first 8 characters are enough to tell them apart on screen.
     private static string Short(string id) => id.Length > 12 ? id[..8] : id;
+
+    private static string ActionLabel(AuditAction action) => action switch
+    {
+        AuditAction.Create => "Created",
+        AuditAction.Update => "Changed",
+        AuditAction.Delete => "Deleted",
+        AuditAction.View => "Viewed",
+        AuditAction.Download => "Downloaded",
+        AuditAction.Export => "Exported",
+        AuditAction.SignIn => "Signed in",
+        AuditAction.SignInFailed => "Sign-in failed",
+        _ => action.ToString(),
+    };
 
     private static Color ActionColor(AuditAction action) => action switch
     {
